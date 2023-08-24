@@ -65,8 +65,7 @@ cdef extern from "embree4/rtcore_geometry.h":
                                  size_t numCurves, size_t numVertices,
                                  size_t numTimeSteps)
     void rtcSetMask(RTCScene scene, unsigned geomID, int mask)
-    void *rtcMapBuffer(RTCScene scene, unsigned geomID, RTCBufferType type)
-    void rtcUnmapBuffer(RTCScene scene, unsigned geomID, RTCBufferType type)
+    void *rtcNewBuffer(RTCScene scene, unsigned geomID, RTCBufferType type)
     void rtcSetBuffer(RTCScene scene, unsigned geomID, RTCBufferType type,
                       void *ptr, size_t offset, size_t stride)
     void rtcEnable(RTCScene scene, unsigned geomID)

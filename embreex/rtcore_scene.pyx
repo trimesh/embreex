@@ -48,7 +48,7 @@ cdef class EmbreeScene:
             self.is_committed = 1
 
         cdef int nv = vec_origins.shape[0]
-        cdef int vo_i, vd_i, vd_step
+        cdef int vd_i, vd_step
         cdef np.ndarray[np.int32_t, ndim=1] intersect_ids
         cdef np.ndarray[np.float32_t, ndim=1] tfars
         cdef rayQueryType query_type

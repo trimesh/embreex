@@ -19,7 +19,7 @@ def run_triangles():
 cdef unsigned int addCube(rtcs.RTCScene scene_i):
     cdef unsigned int mesh = rtcg.rtcNewTriangleMesh(scene_i,
                 rtcg.RTC_GEOMETRY_STATIC, 12, 8, 1)
-    cdef Vertex* vertices = <Vertex*> rtcg.rtcMapBuffer(scene_i, mesh, rtcg.RTC_VERTEX_BUFFER)
+    cdef Vertex* vertices = <Vertex*> rtcg.rtcNewBuffer(scene_i, mesh, rtcg.RTC_VERTEX_BUFFER)
     vertices[0].x = -1
     vertices[0].y = -1
     vertices[0].z = -1
@@ -52,12 +52,11 @@ cdef unsigned int addCube(rtcs.RTCScene scene_i):
     vertices[7].y = +1
     vertices[7].z = +1
 
-    rtcg.rtcUnmapBuffer(scene_i, mesh, rtcg.RTC_VERTEX_BUFFER)
 
     cdef Vec3f *colors = <Vec3f*> malloc(12*sizeof(Vec3f))
 
     cdef int tri = 0
-    cdef Triangle* triangles = <Triangle*> rtcg.rtcMapBuffer(scene_i, mesh,
+    cdef Triangle* triangles = <Triangle*> rtcg.rtcNewBuffer(scene_i, mesh,
                 rtcg.RTC_INDEX_BUFFER)
 
     # left side
@@ -156,7 +155,6 @@ cdef unsigned int addCube(rtcs.RTCScene scene_i):
     triangles[tri].v2 = 5
     tri += 1
 
-    rtcg.rtcUnmapBuffer(scene_i, mesh, rtcg.RTC_INDEX_BUFFER)
 
     return mesh
 
@@ -164,7 +162,7 @@ cdef unsigned int addGroundPlane (rtcs.RTCScene scene_i):
     cdef unsigned int mesh = rtcg.rtcNewTriangleMesh (scene_i,
             rtcg.RTC_GEOMETRY_STATIC, 2, 4, 1)
 
-    cdef Vertex* vertices = <Vertex*> rtcg.rtcMapBuffer(scene_i, mesh, rtcg.RTC_VERTEX_BUFFER)
+    cdef Vertex* vertices = <Vertex*> rtcg.rtcNewBuffer(scene_i, mesh, rtcg.RTC_VERTEX_BUFFER)
     vertices[0].x = -10
     vertices[0].y = -2
     vertices[0].z = -10
@@ -180,15 +178,13 @@ cdef unsigned int addGroundPlane (rtcs.RTCScene scene_i):
     vertices[3].x = +10
     vertices[3].y = -2
     vertices[3].z = +10
-    rtcg.rtcUnmapBuffer(scene_i, mesh, rtcg.RTC_VERTEX_BUFFER)
 
-    cdef Triangle* triangles = <Triangle*> rtcg.rtcMapBuffer(scene_i, mesh, rtcg.RTC_INDEX_BUFFER)
+    cdef Triangle* triangles = <Triangle*> rtcg.rtcNewBuffer(scene_i, mesh, rtcg.RTC_INDEX_BUFFER)
     triangles[0].v0 = 0
     triangles[0].v1 = 2
     triangles[0].v2 = 1
     triangles[1].v0 = 1
     triangles[1].v1 = 2
     triangles[1].v2 = 3
-    rtcg.rtcUnmapBuffer(scene_i, mesh, rtcg.RTC_INDEX_BUFFER)
 
     return mesh

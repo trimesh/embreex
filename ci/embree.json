@@ -29,26 +29,8 @@
     "extract_skip": ["bin/*", "doc/*"],
     "name": "embree4",
     "platform": "linux",
-    "sha256": "8e5dd14c91054708fc589dd679e0fd7de37ebcf8e208e8bc254abc91f4c66c0b",
-    "strip_components": 1,
+      "sha256": "375e829dc31ac5c6c579de34e0b1527e088a3b296fb9d3f90ed892d29592f845",
     "target": "../embree4",
-    "url": "https://github.com/embree/embree/releases/download/v4.1.0/embree-4.1.0.x86_64.linux.tar.gz"
-  },
-  {
-    "name": "embree4",
-    "platform": "windows",
-    "sha256": "8972ad00497b06f6ed83750edf7ff57760b82e5c7262b4c40ce77599f516d197",
-    "target": "../embree4",
-    "strip_components": 1,
-    "url": "https://github.com/embree/embree/releases/download/v4.1.0/embree-4.1.0.x64.windows.zip"
-  },
-  {
-    "extract_skip": ["bin/*", "doc/*"],
-    "name": "embree4",
-    "platform": "mac",
-    "sha256": "2d32b650e0e88b067d2d856473dc70411b2f5b5d27ae95b70feafb1e39364078",
-    "strip_components": 1,
-    "target": "../embree4",
-    "url": "https://github.com/embree/embree/releases/download/v4.1.0/embree-4.1.0.x86_64.macosx.zip"
+    "url": "https://github.com/RenderKit/embree/releases/download/v4.3.1/embree-4.3.1.x86_64.linux.tar.gz"
   }
 ]

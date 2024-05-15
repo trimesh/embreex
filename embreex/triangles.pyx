@@ -5,7 +5,6 @@ cimport rtcore as rtc
 cimport rtcore_ray as rtcr
 cimport rtcore_scene as rtcs
 cimport rtcore_geometry as rtcg
-cimport rtcore_geometry_user as rtcgu
 from rtcore cimport Vertex, Triangle, Vec3f
 from libc.stdlib cimport malloc, free
 

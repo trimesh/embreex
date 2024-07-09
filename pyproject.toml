@@ -1,6 +1,7 @@
 [build-system]
 requires = [
     "setuptools>=59.0",
+    "tomli>=0.10; python_version<'3.7'",
     "Cython<3.0",
     "numpy",
 ]

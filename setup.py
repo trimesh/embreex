@@ -56,22 +56,16 @@ def load_pyproject() -> dict:
     if sys.version_info >= (3, 7):
         return {}
 
-    # store loaded values from the toml
-    values = {}
-    import json
+    import tomli
 
-    # load the toml data with naive string wangling
     with open(os.path.join(_cwd, 'pyproject.toml'), 'r') as f:
-        for line in f:
-            if '=' not in line:
-                continue
-            split = [i.strip() for i in line.strip().split('=')]
-            if split[0] in ('name', 'version'):
-                values[split[0]] = json.loads(split[1])
-    # hardcode numpy dependency on python 3.6
-    values['install_requires'] = ["numpy"]
+        pyproject = tomli.load(f)
 
-    return values
+    return {
+        "name": pyproject["project"]["name"],
+        "version": pyproject["project"]["version"],
+        "install_requires": pyproject["project"]["dependencies"],
+    }
 
 
 try:

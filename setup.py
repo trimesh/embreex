@@ -12,30 +12,28 @@ _cwd = os.path.abspath(os.path.expanduser(os.path.dirname(__file__)))
 
 
 def ext_modules():
-    """
-    Generate a list of extension modules for embreex.
-    """
-
-    if os.name == 'nt':
+    """Generate a list of extension modules for embreex."""
+    if os.name == "nt":
         # embree search locations on windows
-        includes = [get_include(),
-                    'c:/Program Files/Intel/Embree2/include',
-                    os.path.join(_cwd, 'embree2', 'include')]
+        includes = [
+            get_include(),
+            "c:/Program Files/Intel/Embree2/include",
+            os.path.join(_cwd, "embree2", "include"),
+        ]
         libraries = [
-            'c:/Program Files/Intel/Embree2/lib',
-            os.path.join(_cwd, 'embree2', 'lib')]
+            "c:/Program Files/Intel/Embree2/lib",
+            os.path.join(_cwd, "embree2", "lib"),
+        ]
     else:
         # embree search locations on posix
-        includes = [get_include(),
-                    '/opt/local/include',
-                    os.path.join(_cwd, 'embree2', 'include')]
-        libraries = ['/opt/local/lib',
-                     os.path.join(_cwd, 'embree2', 'lib')]
+        includes = [
+            get_include(),
+            "/opt/local/include",
+            os.path.join(_cwd, "embree2", "include"),
+        ]
+        libraries = ["/opt/local/lib", os.path.join(_cwd, "embree2", "lib")]
 
-    ext_modules = cythonize(
-        'embreex/*.pyx',
-        include_path=includes,
-        language_level=2)
+    ext_modules = cythonize("embreex/*.pyx", include_path=includes, language_level=2)
     for ext in ext_modules:
         ext.include_dirs = includes
         ext.library_dirs = libraries
@@ -45,8 +43,7 @@ def ext_modules():
 
 
 def load_pyproject() -> dict:
-    """
-    A hack for Python 3.6 to load data from `pyproject.toml`
+    """A hack for Python 3.6 to load data from `pyproject.toml`
 
     The rest of setup is specified in `pyproject.toml` but moving dependencies
     to `pyproject.toml` requires setuptools>61 which is only available on Python>3.7
@@ -58,7 +55,7 @@ def load_pyproject() -> dict:
 
     import tomli
 
-    with open(os.path.join(_cwd, 'pyproject.toml'), 'r') as f:
+    with open(os.path.join(_cwd, "pyproject.toml"), "r") as f:
         pyproject = tomli.load(f)
 
     return {
@@ -69,12 +66,14 @@ def load_pyproject() -> dict:
 
 
 try:
-    with open(os.path.join(_cwd, 'README.md'), 'r') as _f:
+    with open(os.path.join(_cwd, "README.md"), "r") as _f:
         long_description = _f.read()
 except BaseException:
-    long_description = ''
+    long_description = ""
 
-setup(ext_modules=ext_modules(),
-      long_description=long_description,
-      long_description_content_type='text/markdown',
-      **load_pyproject())
+setup(
+    ext_modules=ext_modules(),
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    **load_pyproject(),
+)

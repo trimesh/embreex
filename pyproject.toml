@@ -2,8 +2,8 @@
 requires = [
     "setuptools>=59.0",
     "tomli>=0.10; python_version<'3.7'",
-    "Cython<3.0",
     "numpy",
+    "cython>=3.0"
 ]
 
 build-backend = "setuptools.build_meta"
@@ -11,6 +11,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "embreex"
 version = "2.17.7.post6"
+requires-python = ">=3.8"
+
 dependencies = ["numpy"]
 description = "Python binding for Intel's Embree ray engine"
 readme = {file = "README.md", content-type = "text/markdown"}

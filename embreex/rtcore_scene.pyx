@@ -12,7 +12,7 @@ cimport rtcore_geometry as rtcg
 
 log = logging.getLogger('embreex')
 
-cdef void error_printer(const rtc.RTCError code, const char *_str):
+cdef void error_printer(const rtc.RTCError code, const char *_str) noexcept:
     """
     error_printer function depends on embree version
     Embree 2.14.1

@@ -8,7 +8,7 @@ cimport rtcore as rtc
 # cimport rtcore_scene as rtcs
 # cimport rtcore_geometry as rtcg
 # cimport rtcore_geometry_user as rtcgu
-from rtcore cimport Vertex, Triangle  # Assuming these are still valid structs
+from rtcore cimport Vertex, Triangle, Vec3f  # Import directly from rtcore
 
 
 cdef extern from "mesh_construction.h":
@@ -69,7 +69,7 @@ cdef class TriangleMesh:
             rtc.rtcReleaseGeometry(self.mesh)  # release in dealloc
 
     cdef void _build_from_flat(self, rtc.EmbreeScene scene,
-                               np.ndarray[floating, ndim=3] tri_vertices):
+                               np.ndarray[floating, ndim=3] tri_vertices) except +:
         cdef int i, j
         cdef int nt = tri_vertices.shape[0]
         # In this scheme, we don't share any vertices.  This leads to cracks,
@@ -106,7 +106,7 @@ cdef class TriangleMesh:
 
     cdef void _build_from_indices(self, rtc.EmbreeScene scene,
                                   np.ndarray[floating, ndim=2] tri_vertices,
-                                  np.ndarray[np.int32_t, ndim=2] tri_indices):
+                                  np.ndarray[np.int32_t, ndim=2] tri_indices) except +:
         cdef int i
         cdef int nv = tri_vertices.shape[0]
         cdef int nt = tri_indices.shape[0]
@@ -137,8 +137,8 @@ cdef class TriangleMesh:
         self.vertices = vertices
         self.indices = triangles
         self.mesh = mesh
-        rtc.rtcCommitGeometry(self.mesh)
-        rtc.rtcAttachGeometry(scene.scene_i, self.mesh)
+        rtc.rtcCommitGeometry(self.mesh)  # Commit geometry
+        rtc.rtcAttachGeometry(scene.scene_i, self.mesh)  #Attach geometry
 
 cdef class ElementMesh(TriangleMesh):
     r'''
@@ -186,7 +186,7 @@ cdef class ElementMesh(TriangleMesh):
 
     cdef void _build_from_hexahedra(self, rtc.EmbreeScene scene,
                                     np.ndarray[floating, ndim=2] quad_vertices,
-                                    np.ndarray[np.int32_t, ndim=2] quad_indices):
+                                    np.ndarray[np.int32_t, ndim=2] quad_indices) except +:
 
         cdef int i, j
         cdef int nv = quad_vertices.shape[0]
@@ -227,7 +227,7 @@ cdef class ElementMesh(TriangleMesh):
 
     cdef void _build_from_tetrahedra(self, rtc.EmbreeScene scene,
                                      np.ndarray[floating, ndim=2] tetra_vertices,
-                                     np.ndarray[np.int32_t, ndim=2] tetra_indices):
+                                     np.ndarray[np.int32_t, ndim=2] tetra_indices) except +:
 
         cdef int i, j
         cdef int nv = tetra_vertices.shape[0]

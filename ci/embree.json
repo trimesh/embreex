@@ -47,5 +47,5 @@
     "target": "../embree4",
     "strip_components": 1,
     "url": "https://github.com/RenderKit/embree/releases/download/v4.3.3/embree-4.3.3.x64.windows.zip"
-  },
+  }
 ]

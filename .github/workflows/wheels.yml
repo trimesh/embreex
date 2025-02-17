@@ -7,6 +7,7 @@ jobs:
     name: Build wheel on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-15, macos-13, windows-latest]  # Use specific versions for clarity
         arch: [x86_64, arm64]

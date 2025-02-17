@@ -1,7 +1,7 @@
 import time
 import numpy as np
 
-from embreex import rtcore_scene as rtcs
+from embreex import rtcore as rtc  # Use the unified rtcore module
 from embreex.mesh_construction import TriangleMesh
 
 N = 4
@@ -17,7 +17,10 @@ def xplane(x):
 triangles = xplane(7.0)
 triangles = np.array(triangles, "float32")
 
-scene = rtcs.EmbreeScene()
+# Embree 4: Create a device first
+device = rtc.EmbreeDevice()
+scene = rtc.EmbreeScene(device)  # Pass the device to the scene
+
 mesh = TriangleMesh(scene, triangles)
 
 origins = np.zeros((N, 3), dtype="float32")
@@ -31,7 +34,7 @@ dirs = np.zeros((N, 3), dtype="float32")
 dirs[:, 0] = 1.0
 
 t1 = time.time()
-res = scene.run(origins, dirs, output=1)
+res = scene.run(origins, dirs, output=True) #output=True is equivalent to output=1
 t2 = time.time()
 print("Ran in {0:.3f} s".format(t2 - t1))
 

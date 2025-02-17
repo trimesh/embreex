@@ -1,7 +1,7 @@
 from unittest import TestCase
 import numpy as np
-from embreex import rtcore as rtc
-from embreex import rtcore_scene as rtcs
+from embreex import rtcore as rtc  # Use unified rtcore module
+#from embreex import rtcore_scene as rtcs # Removed in Embree 4
 from embreex.mesh_construction import TriangleMesh
 from embreex.mesh_construction import ElementMesh
 
@@ -35,19 +35,19 @@ def define_rays_origins_and_directions():
 class Testembreex(TestCase):
     def test_embreex_should_be_able_to_display_embree_version(self):
         embreeDevice = rtc.EmbreeDevice()
-        print(embreeDevice)
+        print(embreeDevice) #The repr has changed in EmbreeDevice
 
     def test_embreex_should_be_able_to_create_a_scene(self):
         embreeDevice = rtc.EmbreeDevice()
-        rtcs.EmbreeScene(embreeDevice)
+        rtc.EmbreeScene(embreeDevice) # Use rtcore
 
     def test_embreex_should_be_able_to_create_several_scenes(self):
         embreeDevice = rtc.EmbreeDevice()
-        rtcs.EmbreeScene(embreeDevice)
-        rtcs.EmbreeScene(embreeDevice)
+        rtc.EmbreeScene(embreeDevice) # Use rtcore
+        rtc.EmbreeScene(embreeDevice) # Use rtcore
 
     def test_embreex_should_be_able_to_create_a_device_if_not_provided(self):
-        rtcs.EmbreeScene()
+        rtc.EmbreeScene() # Use rtcore
 
 
 class TestIntersectionTriangles(TestCase):
@@ -57,7 +57,7 @@ class TestIntersectionTriangles(TestCase):
         triangles = np.array(triangles, "float32")
 
         self.embreeDevice = rtc.EmbreeDevice()
-        self.scene = rtcs.EmbreeScene(self.embreeDevice)
+        self.scene = rtc.EmbreeScene(self.embreeDevice) # Use rtcore
         TriangleMesh(self.scene, triangles)
 
         origins, dirs = define_rays_origins_and_directions()
@@ -66,22 +66,22 @@ class TestIntersectionTriangles(TestCase):
 
     def test_intersect_simple(self):
         res = self.scene.run(self.origins, self.dirs)
-        self.assertTrue([0, 1, 1, -1], res)
+        self.assertTrue(np.array_equal(np.array([0, 1, 1, -1]), res)) # Use np.array_equal
 
     def test_intersect_distance(self):
         res = self.scene.run(self.origins, self.dirs, query="DISTANCE")
         self.assertTrue(np.allclose([6.9, 6.9, 6.9, 1e37], res))
 
     def test_intersect(self):
-        res = self.scene.run(self.origins, self.dirs, output=1, dists=100)
+        res = self.scene.run(self.origins, self.dirs, output=True, dists=100) # output=1 -> output=True
 
-        self.assertTrue([0, 0, 0, -1], res["geomID"])
+        self.assertTrue(np.array_equal(np.array([0, 0, 0, -1]), res["geomID"])) # Use np.array_equal
         ray_inter = res["geomID"] >= 0
         primID = res["primID"][ray_inter]
         u = res["u"][ray_inter]
         v = res["v"][ray_inter]
         tfar = res["tfar"]
-        self.assertTrue([0, 1, 1], primID)
+        self.assertTrue(np.array_equal(np.array([0, 1, 1]), primID))# Use np.array_equal
         self.assertTrue(np.allclose([6.9, 6.9, 6.9, 100], tfar))
         self.assertTrue(np.allclose([0.4, 0.1, 0.15], u))
         self.assertTrue(np.allclose([0.5, 0.4, 0.35], v))
@@ -95,7 +95,7 @@ class TestIntersectionTrianglesFromIndices(TestCase):
         indices = np.array([[0, 1, 2], [1, 3, 2]], "uint32")
 
         self.embreeDevice = rtc.EmbreeDevice()
-        self.scene = rtcs.EmbreeScene(self.embreeDevice)
+        self.scene = rtc.EmbreeScene(self.embreeDevice)  # Use rtcore
         TriangleMesh(self.scene, points, indices)
 
         origins, dirs = define_rays_origins_and_directions()
@@ -104,19 +104,19 @@ class TestIntersectionTrianglesFromIndices(TestCase):
 
     def test_intersect_simple(self):
         res = self.scene.run(self.origins, self.dirs)
-        self.assertTrue([0, 1, 1, -1], res)
+        self.assertTrue(np.array_equal(np.array([0, 1, 1, -1]), res)) # Use np.array_equal
 
     def test_intersect(self):
-        res = self.scene.run(self.origins, self.dirs, output=1)
+        res = self.scene.run(self.origins, self.dirs, output=True) # output=1 -> output=True
 
-        self.assertTrue([0, 0, 0, -1], res["geomID"])
+        self.assertTrue(np.array_equal(np.array([0, 0, 0, -1]), res["geomID"])) # Use np.array_equal
 
         ray_inter = res["geomID"] >= 0
         primID = res["primID"][ray_inter]
         u = res["u"][ray_inter]
         v = res["v"][ray_inter]
         tfar = res["tfar"][ray_inter]
-        self.assertTrue([0, 1, 1], primID)
+        self.assertTrue(np.array_equal(np.array([0, 1, 1]), primID)) # Use np.array_equal
         self.assertTrue(np.allclose([6.9, 6.9, 6.9], tfar))
         self.assertTrue(np.allclose([0.4, 0.1, 0.15], u))
         self.assertTrue(np.allclose([0.5, 0.4, 0.35], v))
@@ -129,7 +129,7 @@ class TestIntersectionTetrahedron(TestCase):
         vertices = np.array(vertices, "float32")
         indices = np.array([[0, 1, 2, 3]], "uint32")
         self.embreeDevice = rtc.EmbreeDevice()
-        self.scene = rtcs.EmbreeScene(self.embreeDevice)
+        self.scene = rtc.EmbreeScene(self.embreeDevice)  # Use rtcore
         ElementMesh(self.scene, vertices, indices)
 
         N = 2
@@ -141,19 +141,19 @@ class TestIntersectionTetrahedron(TestCase):
 
     def test_intersect_simple(self):
         res = self.scene.run(self.origins, self.dirs)
-        self.assertTrue([1, 1], res)
+        self.assertTrue(np.array_equal(np.array([1, 1]), res)) # Use np.array_equal
 
     def test_intersect(self):
-        res = self.scene.run(self.origins, self.dirs, output=1)
+        res = self.scene.run(self.origins, self.dirs, output=True) # output=1 -> output=True
 
-        self.assertTrue([0, 0], res["geomID"])
+        self.assertTrue(np.array_equal(np.array([0, 0]), res["geomID"]))# Use np.array_equal
 
         ray_inter = res["geomID"] >= 0
         primID = res["primID"][ray_inter]
         u = res["u"][ray_inter]
         v = res["v"][ray_inter]
         tfar = res["tfar"][ray_inter]
-        self.assertTrue([0, 1], primID)
+        self.assertTrue(np.array_equal(np.array([0, 1]), primID)) # Use np.array_equal
         self.assertTrue(np.allclose([0.1, 0.1], tfar))
         self.assertTrue(np.allclose([0.1, 0.2], u))
         self.assertTrue(np.allclose([0.1, 0.2], v))
@@ -175,7 +175,7 @@ class TestIntersectionHexahedron(TestCase):
         vertices = np.array(vertices, "float32")
         indices = np.array([[0, 1, 2, 3, 4, 5, 6, 7]], "uint32")
         self.embreeDevice = rtc.EmbreeDevice()
-        self.scene = rtcs.EmbreeScene(self.embreeDevice)
+        self.scene = rtc.EmbreeScene(self.embreeDevice)  # Use rtcore
         ElementMesh(self.scene, vertices, indices)
 
         N = 2
@@ -187,19 +187,19 @@ class TestIntersectionHexahedron(TestCase):
 
     def test_intersect_simple(self):
         res = self.scene.run(self.origins, self.dirs)
-        self.assertTrue([1, 1], res)
+        self.assertTrue(np.array_equal(np.array([1, 1]), res)) # Use np.array_equal
 
     def test_intersect(self):
-        res = self.scene.run(self.origins, self.dirs, output=1)
+        res = self.scene.run(self.origins, self.dirs, output=True) # output=1 -> output=True
 
-        self.assertTrue([0, 0], res["geomID"])
+        self.assertTrue(np.array_equal(np.array([0, 0]), res["geomID"])) # Use np.array_equal
 
         ray_inter = res["geomID"] >= 0
         primID = res["primID"][ray_inter]
         u = res["u"][ray_inter]
         v = res["v"][ray_inter]
         tfar = res["tfar"][ray_inter]
-        self.assertTrue([0, 1], primID)
+        self.assertTrue(np.array_equal(np.array([0, 1]), primID)) # Use np.array_equal
         self.assertTrue(np.allclose([0.1, 0.1], tfar))
         self.assertTrue(np.allclose([0.1, 0.2], u))
         self.assertTrue(np.allclose([0.8, 0.6], v))

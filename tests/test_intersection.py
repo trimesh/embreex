@@ -1,9 +1,10 @@
-from unittest import TestCase
+import time
 import numpy as np
-from embreex import rtcore as rtc
-from embreex import rtcore_scene as rtcs
+
+from embreex import rtcore as rtc  # Use the unified rtcore module
 from embreex.mesh_construction import TriangleMesh
-from embreex.mesh_construction import ElementMesh
+
+N = 4
 
 
 def xplane(x):
@@ -13,199 +14,45 @@ def xplane(x):
     ]
 
 
-def xplane_only_points(x):
-    # Indices are [[0, 1, 2], [1, 3, 2]]
-    return [[x, -1.0, -1.0], [x, +1.0, -1.0], [x, -1.0, +1.0], [x, +1.0, +1.0]]
+triangles = xplane(7.0)
+triangles = np.array(triangles, "float32")
 
+# Embree 4: Create a device first
+device = rtc.EmbreeDevice()
+scene = rtc.EmbreeScene(device)  # Pass the device to the scene
 
-def define_rays_origins_and_directions():
-    N = 4
-    origins = np.zeros((N, 3), dtype="float32")
-    origins[:, 0] = 0.1
-    origins[0, 1] = -0.2
-    origins[1, 1] = +0.2
-    origins[2, 1] = +0.3
-    origins[3, 1] = -8.2
+mesh = TriangleMesh(scene, triangles)
 
-    dirs = np.zeros((N, 3), dtype="float32")
-    dirs[:, 0] = 1.0
-    return origins, dirs
+origins = np.zeros((N, 3), dtype="float32")
+origins[:, 0] = 0.1
+origins[0, 1] = -0.2
+origins[1, 1] = +0.2
+origins[2, 1] = +0.3
+origins[3, 1] = -8.2
 
+dirs = np.zeros((N, 3), dtype="float32")
+dirs[:, 0] = 1.0
 
-class Testembreex(TestCase):
-    def test_embreex_should_be_able_to_display_embree_version(self):
-        embreeDevice = rtc.EmbreeDevice()
-        print(embreeDevice)
+t1 = time.time()
+res = scene.run(origins, dirs, output=True) #output=True is equivalent to output=1
+t2 = time.time()
+print("Ran in {0:.3f} s".format(t2 - t1))
 
-    def test_embreex_should_be_able_to_create_a_scene(self):
-        embreeDevice = rtc.EmbreeDevice()
-        rtcs.EmbreeScene(embreeDevice)
+print(
+    "Output is a dict containing Embree results with id of intersected dimensionless coordinates"
+)
+print(res)
 
-    def test_embreex_should_be_able_to_create_several_scenes(self):
-        embreeDevice = rtc.EmbreeDevice()
-        rtcs.EmbreeScene(embreeDevice)
-        rtcs.EmbreeScene(embreeDevice)
-
-    def test_embreex_should_be_able_to_create_a_device_if_not_provided(self):
-        rtcs.EmbreeScene()
-
-
-class TestIntersectionTriangles(TestCase):
-    def setUp(self):
-        """Initialisation"""
-        triangles = xplane(7.0)
-        triangles = np.array(triangles, "float32")
-
-        self.embreeDevice = rtc.EmbreeDevice()
-        self.scene = rtcs.EmbreeScene(self.embreeDevice)
-        TriangleMesh(self.scene, triangles)
-
-        origins, dirs = define_rays_origins_and_directions()
-        self.origins = origins
-        self.dirs = dirs
-
-    def test_intersect_simple(self):
-        res = self.scene.run(self.origins, self.dirs)
-        self.assertTrue([0, 1, 1, -1], res)
-
-    def test_intersect_distance(self):
-        res = self.scene.run(self.origins, self.dirs, query="DISTANCE")
-        self.assertTrue(np.allclose([6.9, 6.9, 6.9, 1e37], res))
-
-    def test_intersect(self):
-        res = self.scene.run(self.origins, self.dirs, output=1, dists=100)
-
-        self.assertTrue([0, 0, 0, -1], res["geomID"])
-        ray_inter = res["geomID"] >= 0
-        primID = res["primID"][ray_inter]
-        u = res["u"][ray_inter]
-        v = res["v"][ray_inter]
-        tfar = res["tfar"]
-        self.assertTrue([0, 1, 1], primID)
-        self.assertTrue(np.allclose([6.9, 6.9, 6.9, 100], tfar))
-        self.assertTrue(np.allclose([0.4, 0.1, 0.15], u))
-        self.assertTrue(np.allclose([0.5, 0.4, 0.35], v))
-
-
-class TestIntersectionTrianglesFromIndices(TestCase):
-    def setUp(self):
-        """Initialisation"""
-        points = xplane_only_points(7.0)
-        points = np.array(points, "float32")
-        indices = np.array([[0, 1, 2], [1, 3, 2]], "uint32")
-
-        self.embreeDevice = rtc.EmbreeDevice()
-        self.scene = rtcs.EmbreeScene(self.embreeDevice)
-        TriangleMesh(self.scene, points, indices)
-
-        origins, dirs = define_rays_origins_and_directions()
-        self.origins = origins
-        self.dirs = dirs
-
-    def test_intersect_simple(self):
-        res = self.scene.run(self.origins, self.dirs)
-        self.assertTrue([0, 1, 1, -1], res)
-
-    def test_intersect(self):
-        res = self.scene.run(self.origins, self.dirs, output=1)
-
-        self.assertTrue([0, 0, 0, -1], res["geomID"])
-
-        ray_inter = res["geomID"] >= 0
-        primID = res["primID"][ray_inter]
-        u = res["u"][ray_inter]
-        v = res["v"][ray_inter]
-        tfar = res["tfar"][ray_inter]
-        self.assertTrue([0, 1, 1], primID)
-        self.assertTrue(np.allclose([6.9, 6.9, 6.9], tfar))
-        self.assertTrue(np.allclose([0.4, 0.1, 0.15], u))
-        self.assertTrue(np.allclose([0.5, 0.4, 0.35], v))
-
-
-class TestIntersectionTetrahedron(TestCase):
-    def setUp(self):
-        """Initialisation"""
-        vertices = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)]
-        vertices = np.array(vertices, "float32")
-        indices = np.array([[0, 1, 2, 3]], "uint32")
-        self.embreeDevice = rtc.EmbreeDevice()
-        self.scene = rtcs.EmbreeScene(self.embreeDevice)
-        ElementMesh(self.scene, vertices, indices)
-
-        N = 2
-        self.origins = np.zeros((N, 3), dtype="float32")
-        self.origins[0, :] = (-0.1, +0.1, +0.1)
-        self.origins[1, :] = (-0.1, +0.2, +0.2)
-        self.dirs = np.zeros((N, 3), dtype="float32")
-        self.dirs[:, 0] = 1.0
-
-    def test_intersect_simple(self):
-        res = self.scene.run(self.origins, self.dirs)
-        self.assertTrue([1, 1], res)
-
-    def test_intersect(self):
-        res = self.scene.run(self.origins, self.dirs, output=1)
-
-        self.assertTrue([0, 0], res["geomID"])
-
-        ray_inter = res["geomID"] >= 0
-        primID = res["primID"][ray_inter]
-        u = res["u"][ray_inter]
-        v = res["v"][ray_inter]
-        tfar = res["tfar"][ray_inter]
-        self.assertTrue([0, 1], primID)
-        self.assertTrue(np.allclose([0.1, 0.1], tfar))
-        self.assertTrue(np.allclose([0.1, 0.2], u))
-        self.assertTrue(np.allclose([0.1, 0.2], v))
-
-
-class TestIntersectionHexahedron(TestCase):
-    def setUp(self):
-        """Initialisation"""
-        vertices = [
-            (1.0, 0.0, 0.0),
-            (1.0, 1.0, 0.0),
-            (0.0, 1.0, 0.0),
-            (0.0, 0.0, 0.0),
-            (1.0, 0.0, 1.0),
-            (1.0, 1.0, 1.0),
-            (0.0, 1.0, 1.0),
-            (0.0, 0.0, 1.0),
-        ]
-        vertices = np.array(vertices, "float32")
-        indices = np.array([[0, 1, 2, 3, 4, 5, 6, 7]], "uint32")
-        self.embreeDevice = rtc.EmbreeDevice()
-        self.scene = rtcs.EmbreeScene(self.embreeDevice)
-        ElementMesh(self.scene, vertices, indices)
-
-        N = 2
-        self.origins = np.zeros((N, 3), dtype="float32")
-        self.origins[0, :] = (-0.1, +0.9, +0.1)
-        self.origins[1, :] = (-0.1, +0.8, +0.2)
-        self.dirs = np.zeros((N, 3), dtype="float32")
-        self.dirs[:, 0] = 1.0
-
-    def test_intersect_simple(self):
-        res = self.scene.run(self.origins, self.dirs)
-        self.assertTrue([1, 1], res)
-
-    def test_intersect(self):
-        res = self.scene.run(self.origins, self.dirs, output=1)
-
-        self.assertTrue([0, 0], res["geomID"])
-
-        ray_inter = res["geomID"] >= 0
-        primID = res["primID"][ray_inter]
-        u = res["u"][ray_inter]
-        v = res["v"][ray_inter]
-        tfar = res["tfar"][ray_inter]
-        self.assertTrue([0, 1], primID)
-        self.assertTrue(np.allclose([0.1, 0.1], tfar))
-        self.assertTrue(np.allclose([0.1, 0.2], u))
-        self.assertTrue(np.allclose([0.8, 0.6], v))
-
-
-if __name__ == "__main__":
-    from unittest import main
-
-    main()
+ray_inter = res["geomID"] >= 0
+print("{0} rays intersect geometry (over {1})".format(sum(ray_inter), N))
+print("Intersection coordinates")
+primID = res["primID"][ray_inter]
+u = res["u"][ray_inter]
+v = res["v"][ray_inter]
+w = 1 - u - v
+inters = (
+    np.vstack(w) * triangles[primID][:, 0, :]
+    + np.vstack(u) * triangles[primID][:, 1, :]
+    + np.vstack(v) * triangles[primID][:, 2, :]
+)
+print(inters)

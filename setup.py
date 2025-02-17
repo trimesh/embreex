@@ -17,21 +17,21 @@ def ext_modules():
         # embree search locations on windows
         includes = [
             get_include(),
-            "c:/Program Files/Intel/Embree2/include",
-            os.path.join(_cwd, "embree2", "include"),
+            "c:/Program Files/Intel/embree4/include",
+            os.path.join(_cwd, "embree4", "include"),
         ]
         libraries = [
-            "c:/Program Files/Intel/Embree2/lib",
-            os.path.join(_cwd, "embree2", "lib"),
+            "c:/Program Files/Intel/embree4/lib",
+            os.path.join(_cwd, "embree4", "lib"),
         ]
     else:
         # embree search locations on posix
         includes = [
             get_include(),
             "/opt/local/include",
-            os.path.join(_cwd, "embree2", "include"),
+            os.path.join(_cwd, "embree4", "include"),
         ]
-        libraries = ["/opt/local/lib", os.path.join(_cwd, "embree2", "lib")]
+        libraries = ["/opt/local/lib", os.path.join(_cwd, "embree4", "lib")]
 
     ext_modules = cythonize("embreex/*.pyx", include_path=includes, language_level=2)
     for ext in ext_modules:

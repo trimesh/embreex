@@ -8,16 +8,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-13]
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-15-intel]
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
       name: Install Python
       with:
-        python-version: '3.11'
+        python-version: '3.13'
     - name: Install cibuildwheel
       run: |
-        python -m pip install cibuildwheel==2.22.0
+        python -m pip install cibuildwheel==3.2.1
     - name: Build wheel
       run: |
         python -m cibuildwheel --output-dir dist
@@ -61,6 +61,6 @@ jobs:
       - name: Download Wheels
         uses: actions/download-artifact@v3
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@release/v1.13.0
         with:
           packages-dir: wheels

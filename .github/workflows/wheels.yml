@@ -51,7 +51,7 @@ jobs:
         with:
           allowUpdates: true
           tag: ${{ env.tag }}
-          artifacts: "wheels/*.whl"
+          artifacts: "dist/*.whl"
   pypi:
     name: Release to PyPI
     needs: [wheels]
@@ -63,8 +63,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Download Wheels
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.13.0
         with:
-          packages-dir: wheels
+          packages-dir: dist

@@ -21,7 +21,7 @@ jobs:
     - name: Build wheel
       run: |
         python -m cibuildwheel --output-dir dist
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: wheels
         path: dist/
@@ -41,7 +41,7 @@ jobs:
         run: |
           export V=$(python -c "print(next(iter(eval(L.split('=')[-1]) for L in open('pyproject.toml') if 'version =' in L)))")
           echo "tag=${V}" >> "$GITHUB_ENV"
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
@@ -59,7 +59,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Download Wheels
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1.13.0
         with:

@@ -17,6 +17,7 @@
     "target": "../embree4",
     "url": "https://github.com/RenderKit/embree/releases/download/v4.4.0/embree-4.4.0.x86_64.macosx.zip",
     "symlink": {
+      "lib/libembree4.dylib": "lib/libembree4.4.dylib",
       "lib/libtbb.dylib": "lib/libtbb.12.11.dylib",
       "lib/libtbb.12.dylib": "lib/libtbb.12.11.dylib"
     }
@@ -30,6 +31,7 @@
     "target": "../embree4",
     "url": "https://github.com/RenderKit/embree/releases/download/v4.4.0/embree-4.4.0.arm64.macosx.zip",
     "symlink": {
+      "lib/libembree4.dylib": "lib/libembree4.4.dylib",
       "lib/libtbb.dylib": "lib/libtbb.12.11.dylib",
       "lib/libtbb.12.dylib": "lib/libtbb.12.11.dylib"
     }

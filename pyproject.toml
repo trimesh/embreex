@@ -26,7 +26,7 @@ skip =  "pp* *i686 *-win32 *musllinux*"
 manylinux-x86_64-image = "manylinux_2_28"
 before-test = "pip install pytest"
 test-command = "pytest -v {project}/tests"
-before-build = "python {project}/ci/fetch-embree.py --install embree4"
+before-build = "python {project}/package/fetch-embree.py --install embree4"
 
 [tool.cibuildwheel.windows]
 before-build = "pip install delvewheel && python {project}\\ci\\fetch-embree.py --install embree4"
@@ -38,8 +38,7 @@ repair-wheel-command = "DYLD_LIBRARY_PATH=embree4/lib delocate-wheel --require-a
 [tool.cibuildwheel.linux]
 repair-wheel-command = "LD_LIBRARY_PATH=`realpath embree4/lib`; auditwheel repair -w {dest_dir} {wheel}"
 
-[tool.ruff]
+[tool.ruff.lint]
 select = ["E", "F", # the default rules
-          "T201",   # disallow print statements
-	   "B",     # pass bugbear
-	   "D"]
+       "B"     # pass bugbear
+       	  ]

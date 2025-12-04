@@ -33,14 +33,16 @@ def ext_modules():
     for ext in ext_modules:
         ext.include_dirs = includes
         ext.library_dirs = libraries
-        ext.libraries = ["embree4"]
-        # on macOS, set rpath so the loader can find libraries
+        # on macOS with Embree 4.x, link against the versioned library directly
         if sys.platform == "darwin":
+            ext.libraries = ["embree4.4"]
             # Add rpath to find libembree4 during build and set loader_path for runtime
             ext.extra_link_args = [
                 "-Wl,-rpath,@loader_path",
                 "-Wl,-rpath," + os.path.join(_cwd, 'embree4', 'lib')
             ]
+        else:
+            ext.libraries = ["embree4"]
 
     return ext_modules
 

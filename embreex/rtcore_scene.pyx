@@ -28,9 +28,9 @@ cdef void error_printer(const rtc.RTCError code, const char *_str) noexcept:
 cdef class EmbreeScene:
     def __init__(self, rtc.EmbreeDevice device=None, robust=False):
         if device is None:
-            # We store the embree device inside EmbreeScene to avoid premature deletion
-            self.device = rtc.EmbreeDevice()
-            device = self.device
+            device = rtc.EmbreeDevice()
+        # We store the embree device inside EmbreeScene to avoid premature deletion
+        self.device = device
         flags = RTC_SCENE_STATIC
         if robust:
             # bitwise-or the robust flag

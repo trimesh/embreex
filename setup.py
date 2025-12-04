@@ -33,7 +33,7 @@ def ext_modules():
     for ext in ext_modules:
         ext.include_dirs = includes
         ext.library_dirs = libraries
-        ext.libraries = ["embree"]
+        ext.libraries = ["embree4"]
 
     return ext_modules
 

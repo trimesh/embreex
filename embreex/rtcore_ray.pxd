@@ -8,28 +8,38 @@ cdef extern from "embree4/rtcore_ray.h":
     # This is for a *single* ray
     cdef struct RTCRay:
         # Ray data
-        float org[3]
-        float align0
-
-        float dir[3]
-        float align1
-
+        float org_x
+        float org_y
+        float org_z
         float tnear
-        float tfar
 
+        float dir_x
+        float dir_y
+        float dir_z
         float time
-        int mask
 
-        # Hit data
-        float Ng[3]
-        float align2
+        float tfar
+        unsigned int mask
+        unsigned int id
+        unsigned int flags
+
+    # Hit data structure
+    cdef struct RTCHit:
+        float Ng_x
+        float Ng_y
+        float Ng_z
 
         float u
         float v
 
-        int geomID
-        int primID
-        int instID
+        unsigned int primID
+        unsigned int geomID
+        unsigned int instID[1]  # RTC_MAX_INSTANCE_LEVEL_COUNT
+
+    # Combined ray/hit structure
+    cdef struct RTCRayHit:
+        RTCRay ray
+        RTCHit hit
 
     # This is for a packet of 4 rays
     cdef struct RTCRay4:

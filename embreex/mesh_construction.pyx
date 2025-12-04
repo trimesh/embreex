@@ -69,11 +69,12 @@ cdef class TriangleMesh:
         # In this scheme, we don't share any vertices.  This leads to cracks,
         # but also means we have exactly three times as many vertices as
         # triangles.
-        cdef unsigned int mesh = rtcg.rtcNewTriangleMesh(scene.scene_i,
-                    rtcg.RTC_GEOMETRY_STATIC, nt, nt*3, 1)
+        cdef rtcg.RTCGeometry geom = rtcg.rtcNewGeometry(scene.device.device,
+                    rtcg.RTC_GEOMETRY_TYPE_TRIANGLE)
 
-        cdef Vertex* vertices = <Vertex*> rtcg.rtcNewBuffer(scene.scene_i, mesh,
-                        rtcg.RTC_VERTEX_BUFFER)
+        cdef Vertex* vertices = <Vertex*> rtcg.rtcSetNewGeometryBuffer(geom,
+                        rtcg.RTC_BUFFER_TYPE_VERTEX, 0, rtcg.RTC_FORMAT_FLOAT3,
+                        4 * sizeof(float), nt * 3)
 
         for i in range(nt):
             for j in range(3):
@@ -81,12 +82,17 @@ cdef class TriangleMesh:
                 vertices[i*3 + j].y = tri_vertices[i,j,1]
                 vertices[i*3 + j].z = tri_vertices[i,j,2]
 
-        cdef Triangle* triangles = <Triangle*> rtcg.rtcNewBuffer(scene.scene_i,
-                        mesh, rtcg.RTC_INDEX_BUFFER)
+        cdef Triangle* triangles = <Triangle*> rtcg.rtcSetNewGeometryBuffer(geom,
+                        rtcg.RTC_BUFFER_TYPE_INDEX, 0, rtcg.RTC_FORMAT_UINT3,
+                        3 * sizeof(unsigned int), nt)
         for i in range(nt):
             triangles[i].v0 = i*3 + 0
             triangles[i].v1 = i*3 + 1
             triangles[i].v2 = i*3 + 2
+
+        rtcg.rtcCommitGeometry(geom)
+        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        rtcg.rtcReleaseGeometry(geom)
 
         self.vertices = vertices
         self.indices = triangles
@@ -99,13 +105,15 @@ cdef class TriangleMesh:
         cdef int nv = tri_vertices.shape[0]
         cdef int nt = tri_indices.shape[0]
 
-        cdef unsigned int mesh = rtcg.rtcNewTriangleMesh(scene.scene_i,
-                    rtcg.RTC_GEOMETRY_STATIC, nt, nv, 1)
+        cdef rtcg.RTCGeometry geom = rtcg.rtcNewGeometry(scene.device.device,
+                    rtcg.RTC_GEOMETRY_TYPE_TRIANGLE)
 
         # set up vertex and triangle arrays. In this case, we just read
         # them directly from the inputs
-        cdef Vertex* vertices = <Vertex*> rtcg.rtcNewBuffer(scene.scene_i, mesh,
-                                                    rtcg.RTC_VERTEX_BUFFER)
+        cdef Vertex* vertices = <Vertex*> rtcg.rtcSetNewGeometryBuffer(geom,
+                                                    rtcg.RTC_BUFFER_TYPE_VERTEX, 0,
+                                                    rtcg.RTC_FORMAT_FLOAT3,
+                                                    4 * sizeof(float), nv)
 
         for i in range(nv):
             vertices[i].x = tri_vertices[i, 0]
@@ -113,14 +121,18 @@ cdef class TriangleMesh:
             vertices[i].z = tri_vertices[i, 2]
 
 
-        cdef Triangle* triangles = <Triangle*> rtcg.rtcNewBuffer(scene.scene_i,
-                        mesh, rtcg.RTC_INDEX_BUFFER)
+        cdef Triangle* triangles = <Triangle*> rtcg.rtcSetNewGeometryBuffer(geom,
+                        rtcg.RTC_BUFFER_TYPE_INDEX, 0, rtcg.RTC_FORMAT_UINT3,
+                        3 * sizeof(unsigned int), nt)
 
         for i in range(nt):
             triangles[i].v0 = tri_indices[i][0]
             triangles[i].v1 = tri_indices[i][1]
             triangles[i].v2 = tri_indices[i][2]
 
+        rtcg.rtcCommitGeometry(geom)
+        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        rtcg.rtcReleaseGeometry(geom)
 
         self.vertices = vertices
         self.indices = triangles
@@ -183,12 +195,13 @@ cdef class ElementMesh(TriangleMesh):
         # into two triangles.
         cdef int nt = 6*2*ne
 
-        cdef unsigned int mesh = rtcg.rtcNewTriangleMesh(scene.scene_i,
-                    rtcg.RTC_GEOMETRY_STATIC, nt, nv, 1)
+        cdef rtcg.RTCGeometry geom = rtcg.rtcNewGeometry(scene.device.device,
+                    rtcg.RTC_GEOMETRY_TYPE_TRIANGLE)
 
         # first just copy over the vertices
-        cdef Vertex* vertices = <Vertex*> rtcg.rtcNewBuffer(scene.scene_i, mesh,
-                        rtcg.RTC_VERTEX_BUFFER)
+        cdef Vertex* vertices = <Vertex*> rtcg.rtcSetNewGeometryBuffer(geom,
+                        rtcg.RTC_BUFFER_TYPE_VERTEX, 0, rtcg.RTC_FORMAT_FLOAT3,
+                        4 * sizeof(float), nv)
 
         for i in range(nv):
             vertices[i].x = quad_vertices[i, 0]
@@ -196,14 +209,19 @@ cdef class ElementMesh(TriangleMesh):
             vertices[i].z = quad_vertices[i, 2]
 
         # now build up the triangles
-        cdef Triangle* triangles = <Triangle*> rtcg.rtcNewBuffer(scene.scene_i,
-                        mesh, rtcg.RTC_INDEX_BUFFER)
+        cdef Triangle* triangles = <Triangle*> rtcg.rtcSetNewGeometryBuffer(geom,
+                        rtcg.RTC_BUFFER_TYPE_INDEX, 0, rtcg.RTC_FORMAT_UINT3,
+                        3 * sizeof(unsigned int), nt)
 
         for i in range(ne):
             for j in range(12):
                 triangles[12*i+j].v0 = quad_indices[i][triangulate_hex[j][0]]
                 triangles[12*i+j].v1 = quad_indices[i][triangulate_hex[j][1]]
                 triangles[12*i+j].v2 = quad_indices[i][triangulate_hex[j][2]]
+
+        rtcg.rtcCommitGeometry(geom)
+        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        rtcg.rtcReleaseGeometry(geom)
 
         self.vertices = vertices
         self.indices = triangles
@@ -220,12 +238,13 @@ cdef class ElementMesh(TriangleMesh):
         # There are four triangle faces for each tetrahedron.
         cdef int nt = 4*ne
 
-        cdef unsigned int mesh = rtcg.rtcNewTriangleMesh(scene.scene_i,
-                    rtcg.RTC_GEOMETRY_STATIC, nt, nv, 1)
+        cdef rtcg.RTCGeometry geom = rtcg.rtcNewGeometry(scene.device.device,
+                    rtcg.RTC_GEOMETRY_TYPE_TRIANGLE)
 
         # Just copy over the vertices
-        cdef Vertex* vertices = <Vertex*> rtcg.rtcNewBuffer(scene.scene_i, mesh,
-                        rtcg.RTC_VERTEX_BUFFER)
+        cdef Vertex* vertices = <Vertex*> rtcg.rtcSetNewGeometryBuffer(geom,
+                        rtcg.RTC_BUFFER_TYPE_VERTEX, 0, rtcg.RTC_FORMAT_FLOAT3,
+                        4 * sizeof(float), nv)
 
         for i in range(nv):
             vertices[i].x = tetra_vertices[i, 0]
@@ -233,13 +252,18 @@ cdef class ElementMesh(TriangleMesh):
             vertices[i].z = tetra_vertices[i, 2]
 
         # Now build up the triangles
-        cdef Triangle* triangles = <Triangle*> rtcg.rtcNewBuffer(scene.scene_i,
-                        mesh, rtcg.RTC_INDEX_BUFFER)
+        cdef Triangle* triangles = <Triangle*> rtcg.rtcSetNewGeometryBuffer(geom,
+                        rtcg.RTC_BUFFER_TYPE_INDEX, 0, rtcg.RTC_FORMAT_UINT3,
+                        3 * sizeof(unsigned int), nt)
         for i in range(ne):
             for j in range(4):
                 triangles[4*i+j].v0 = tetra_indices[i][triangulate_tetra[j][0]]
                 triangles[4*i+j].v1 = tetra_indices[i][triangulate_tetra[j][1]]
                 triangles[4*i+j].v2 = tetra_indices[i][triangulate_tetra[j][2]]
+
+        rtcg.rtcCommitGeometry(geom)
+        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        rtcg.rtcReleaseGeometry(geom)
 
         self.vertices = vertices
         self.indices = triangles

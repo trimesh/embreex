@@ -5,38 +5,31 @@ cimport numpy as np
 
 
 cdef extern from "embree4/rtcore.h":
-    cdef int RTCORE_VERSION_MAJOR
-    cdef int RTCORE_VERSION_MINOR
-    cdef int RTCORE_VERSION_PATCH
+    cdef int RTC_VERSION_MAJOR
+    cdef int RTC_VERSION_MINOR
+    cdef int RTC_VERSION_PATCH
 
     void rtcInit(const char* cfg)
     void rtcExit()
 
     cdef enum RTCError:
-        RTC_NO_ERROR
-        RTC_UNKNOWN_ERROR
-        RTC_INVALID_ARGUMENT
-        RTC_INVALID_OPERATION
-        RTC_OUT_OF_MEMORY
-        RTC_UNSUPPORTED_CPU
-        RTC_CANCELLED
+        RTC_ERROR_NONE
+        RTC_ERROR_UNKNOWN
+        RTC_ERROR_INVALID_ARGUMENT
+        RTC_ERROR_INVALID_OPERATION
+        RTC_ERROR_OUT_OF_MEMORY
+        RTC_ERROR_UNSUPPORTED_CPU
+        RTC_ERROR_CANCELLED
 
     # typedef struct __RTCDevice {}* RTCDevice;
     ctypedef void* RTCDevice
 
     RTCDevice rtcNewDevice(const char* cfg)
-    void rtcDeleteDevice(RTCDevice device)
+    void rtcReleaseDevice(RTCDevice device)
 
-    RTCError rtcGetError()
-    ctypedef void (*RTCErrorFunc)(const RTCError code, const char* _str)
-    void rtcSetErrorFunction(RTCErrorFunc func)
-
-    # Embree 2.14.0-0
-    void rtcDeviceSetErrorFunction(RTCDevice device, RTCErrorFunc func)
-
-    # Embree 2.15.1
-    ctypedef void (*RTCErrorFunc2)(void* userPtr, const RTCError code, const char* str)
-    void rtcDeviceSetErrorFunction2(RTCDevice device, RTCErrorFunc2 func, void* userPtr)
+    RTCError rtcGetDeviceError(RTCDevice device)
+    ctypedef void (*RTCErrorFunc)(void* userPtr, RTCError code, const char* str)
+    void rtcSetDeviceErrorFunction(RTCDevice device, RTCErrorFunc func, void* userPtr)
 
     ctypedef bint RTCMemoryMonitorFunc(const ssize_t _bytes, const bint post)
     void rtcSetMemoryMonitorFunction(RTCMemoryMonitorFunc func)

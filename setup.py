@@ -34,6 +34,9 @@ def ext_modules():
         ext.include_dirs = includes
         ext.library_dirs = libraries
         ext.libraries = ["embree4"]
+        # on macOS, set rpath so delocate can find the libraries
+        if sys.platform == "darwin":
+            ext.extra_link_args = ["-Wl,-rpath,@loader_path"]
 
     return ext_modules
 

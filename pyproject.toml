@@ -41,6 +41,7 @@ before-build = "pip install delvewheel && python {project}\\package\\fetch-embre
 repair-wheel-command = "delvewheel repair --add-path embree4\\bin --no-mangle tbb12.dll;embree4.dll -w {dest_dir} {wheel}"
  
 [tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "13.0" }
 repair-wheel-command = "DYLD_LIBRARY_PATH=embree4/lib delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
 
 [tool.cibuildwheel.linux]

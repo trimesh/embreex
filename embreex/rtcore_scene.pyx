@@ -22,7 +22,7 @@ cdef void error_printer(void* userPtr, const rtc.RTCError code, const char *_str
 
 
 cdef class EmbreeScene:
-    def __init__(self, rtc.EmbreeDevice device=None, robust=False):
+    def __init__(self, rtc.EmbreeDevice device=None, robust=True):
         if device is None:
             device = rtc.EmbreeDevice()
         # We store the embree device inside EmbreeScene to avoid premature deletion
@@ -124,8 +124,8 @@ cdef class EmbreeScene:
                     Ng[i, 2] = rayhit.hit.Ng_z
             else:
                 rtcOccluded1(self.scene_i, &rayhit.ray, NULL)
-                # Convert unsigned INVALID_GEOMETRY_ID to signed -1 for compatibility
-                intersect_ids[i] = -1 if rayhit.hit.geomID == INVALID_GEOMETRY_ID else <int>rayhit.hit.geomID
+                # In Embree 4, occlusion is signaled by setting ray.tfar to -inf
+                intersect_ids[i] = 0 if rayhit.ray.tfar < 0 else -1
 
         if output:
             return {'u':u, 'v':v, 'Ng': Ng, 'tfar': tfars, 'primID': primID, 'geomID': geomID}

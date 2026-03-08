@@ -1,0 +1,48 @@
+[
+  {
+    "extract_skip": ["bin/*", "doc/*"],
+    "name": "embree4",
+    "platform": "linux",
+    "architecture": "x86_64",
+    "sha256": "cb3d4402537fc9165c76c3316b8953dcfea523cd1eaf588e2de7639864ee3c57",
+    "target": "../embree4",
+    "url": "https://github.com/RenderKit/embree/releases/download/v4.4.0/embree-4.4.0.x86_64.linux.tar.gz"
+  },
+  {
+    "extract_skip": ["bin/*", "doc/*"],
+    "name": "embree4",
+    "platform": "macos",
+    "architecture": "x86_64",
+    "sha256": "435b4ef3421eb75cf41a41438d44b760f4d86c24124e0b9a0ed9d85adff54b4d",
+    "target": "../embree4",
+    "url": "https://github.com/RenderKit/embree/releases/download/v4.4.0/embree-4.4.0.x86_64.macosx.zip",
+    "symlink": {
+      "lib/libembree4.dylib": "lib/libembree4.4.dylib",
+      "lib/libtbb.dylib": "lib/libtbb.12.11.dylib",
+      "lib/libtbb.12.dylib": "lib/libtbb.12.11.dylib"
+    }
+  },
+  {
+    "extract_skip": ["bin/*", "doc/*"],
+    "name": "embree4",
+    "platform": "macos",
+    "architecture": "arm64",
+    "sha256": "288a5bb1adc3d4cd0f86646008f4ac442b958b1635bf60cecff8f1b232e999a1",
+    "target": "../embree4",
+    "url": "https://github.com/RenderKit/embree/releases/download/v4.4.0/embree-4.4.0.arm64.macosx.zip",
+    "symlink": {
+      "lib/libembree4.dylib": "lib/libembree4.4.dylib",
+      "lib/libtbb.dylib": "lib/libtbb.12.11.dylib",
+      "lib/libtbb.12.dylib": "lib/libtbb.12.11.dylib"
+    }
+  },
+  {
+    "extract_skip": ["doc/*"],
+    "name": "embree4",
+    "platform": "windows",
+    "architecture": "amd64",
+    "sha256": "d951e5e6bd295c54cdd66be9cdb44a4e8c42fb38a99f94f79305e48765fc3454",
+    "target": "../embree4",
+    "url": "https://github.com/RenderKit/embree/releases/download/v4.4.0/embree-4.4.0.x64.windows.zip"
+  }
+]

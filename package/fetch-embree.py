@@ -3,15 +3,16 @@
 and copy them into the home directory for every plaform.
 """
 
+import argparse
+import json
+import logging
 import os
 import sys
-import json
 import tarfile
-import logging
-import argparse
-from io import BytesIO
 from fnmatch import fnmatch
-from platform import system
+from io import BytesIO
+from platform import system, uname
+from subprocess import check_call
 from typing import Optional
 from zipfile import ZipFile
 
@@ -84,6 +85,7 @@ def handle_fetch(
     extract_skip: Optional[bool] = None,
     extract_only: Optional[bool] = None,
     strip_components: int = 0,
+    symlink: Optional[dict] = None,
 ):
     """A macro to fetch a remote resource (usually an executable) and
     move it somewhere on the file system.
@@ -130,7 +132,7 @@ def handle_fetch(
             members = tar.infolist()
         else:
             # mode needs to know what type of compression
-            mode = f'r:{url.split(".")[-1]}'
+            mode = f"r:{url.split('.')[-1]}"
             # get the archive
             tar = tarfile.open(fileobj=BytesIO(raw), mode=mode)
             members = tar.getmembers()
@@ -175,19 +177,52 @@ def handle_fetch(
             # python os.chmod takes an octal value
             os.chmod(path, int(str(chmod), base=8))
 
+    if symlink is not None:
+        for k, v in symlink.items():
+            # todo : doesn't work on windows obviously
+            check_call(["ln", "-sf", os.path.join(target, v), os.path.join(target, k)])
+
 
 def load_config(path: Optional[str] = None) -> list:
     """Load a config file for embree download locations."""
     if path is None or len(path) == 0:
         # use a default config file
         path = os.path.join(_cwd, "embree.json")
-    with open(path, "r") as f:
+    with open(path) as f:
         return json.load(f)
 
 
-def is_current_platform(platform: str) -> bool:
-    """Check to see if a string platform identifier matches the current platform."""
+def is_current_platform(platform: str, architecture: Optional[str]) -> bool:
+    """Check to see if a string platform identifier matches the current platform.
+
+    Parameters
+    ----------
+    platform
+      Checked against `platform.system`
+    architecture
+      Checked against `platform.uname.machine`
+
+    Returns
+    -------
+    matched
+      If the current platform matches the request.
+
+    """
     # 'linux', 'darwin', 'windows'
+
+    if architecture is not None:
+        # Check for cibuildwheel target architecture first
+        target_arch = os.environ.get('ARCHFLAGS', '')
+        if 'arm64' in target_arch:
+            machine = 'arm64'
+        elif 'x86_64' in target_arch:
+            machine = 'x86_64'
+        else:
+            machine = uname().machine.lower()
+        
+        if architecture.lower() not in machine.lower():
+            return False
+
     current = system().lower().strip()
     if current.startswith("dar"):
         return platform.startswith("dar") or platform.startswith("mac")
@@ -217,9 +252,19 @@ if __name__ == "__main__":
     else:
         select = set(" ".join(args.install).replace(",", " ").split())
 
+    print(system(), uname())
+
     for option in config:
-        if option["name"] in select and is_current_platform(option["platform"]):
+        print(
+            option["platform"],
+            option.get("architecture", None),
+            is_current_platform(option["platform"], option.get("architecture", None)),
+        )
+        if option["name"] in select and is_current_platform(
+            option["platform"], option.get("architecture", None)
+        ):
             subset = option.copy()
             subset.pop("name")
             subset.pop("platform")
+            subset.pop("architecture")
             handle_fetch(**subset)

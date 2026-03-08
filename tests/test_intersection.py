@@ -205,6 +205,19 @@ class TestIntersectionHexahedron(TestCase):
         self.assertTrue(np.allclose([0.8, 0.6], v))
 
 
+class TestOccludedQuery(TestCase):
+    def test_occluded(self):
+        """Occluded query: hits return >= 0, misses return -1."""
+        triangles = np.array(xplane(7.0), "float32")
+        scene = rtcs.EmbreeScene()
+        TriangleMesh(scene, triangles)
+        origins, dirs = define_rays_origins_and_directions()
+        res = scene.run(origins, dirs, query="OCCLUDED")
+        # First 3 rays hit the plane, 4th misses (y=-8.2 outside)
+        self.assertTrue(np.all(res[:3] >= 0))
+        self.assertEqual(res[3], -1)
+
+
 if __name__ == "__main__":
     from unittest import main
 

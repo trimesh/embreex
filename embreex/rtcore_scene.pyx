@@ -12,13 +12,9 @@ cimport rtcore_geometry as rtcg
 
 log = logging.getLogger('embreex')
 
-cdef void error_printer(const rtc.RTCError code, const char *_str) noexcept:
+cdef void error_printer(void* userPtr, const rtc.RTCError code, const char *_str) noexcept:
     """
-    error_printer function depends on embree version
-    Embree 2.14.1
-    -> cdef void error_printer(const rtc.RTCError code, const char *_str):
-    Embree 2.17.1
-    -> cdef void error_printer(void* userPtr, const rtc.RTCError code, const char *_str):
+    error_printer function for Embree 4.x
     """
     log.error("ERROR CAUGHT IN EMBREE")
     rtc.print_error(code)
@@ -26,17 +22,18 @@ cdef void error_printer(const rtc.RTCError code, const char *_str) noexcept:
 
 
 cdef class EmbreeScene:
-    def __init__(self, rtc.EmbreeDevice device=None, robust=False):
+    def __init__(self, rtc.EmbreeDevice device=None, robust=True):
         if device is None:
             device = rtc.EmbreeDevice()
         # We store the embree device inside EmbreeScene to avoid premature deletion
         self.device = device
-        flags = RTC_SCENE_STATIC
+        rtc.rtcSetDeviceErrorFunction(device.device, error_printer, NULL)
+        self.scene_i = rtcNewScene(device.device)
+        flags = RTC_SCENE_FLAG_NONE
         if robust:
             # bitwise-or the robust flag
-            flags |= RTC_SCENE_ROBUST
-        rtc.rtcDeviceSetErrorFunction(device.device, error_printer)
-        self.scene_i = rtcDeviceNewScene(device.device, flags, RTC_INTERSECT1)
+            flags |= RTC_SCENE_FLAG_ROBUST
+        rtcSetSceneFlags(self.scene_i, flags)
         self.is_committed = 0
 
     def run(self, np.ndarray[np.float32_t, ndim=2] vec_origins,
@@ -44,11 +41,11 @@ cdef class EmbreeScene:
                   dists=None,query='INTERSECT',output=None):
 
         if self.is_committed == 0:
-            rtcCommit(self.scene_i)
+            rtcCommitScene(self.scene_i)
             self.is_committed = 1
 
         cdef int nv = vec_origins.shape[0]
-        cdef int vo_i, vd_i, vd_step
+        cdef int vd_i, vd_step
         cdef np.ndarray[np.int32_t, ndim=1] intersect_ids
         cdef np.ndarray[np.float32_t, ndim=1] tfars
         cdef rayQueryType query_type
@@ -82,7 +79,8 @@ cdef class EmbreeScene:
         else:
             intersect_ids = np.empty(nv, dtype="int32")
 
-        cdef rtcr.RTCRay ray
+        cdef rtcr.RTCRayHit rayhit
+        cdef unsigned int INVALID_GEOMETRY_ID = 0xFFFFFFFF
         vd_i = 0
         vd_step = 1
         # If vec_directions is 1 long, we won't be updating it.
@@ -90,35 +88,44 @@ cdef class EmbreeScene:
 
         for i in range(nv):
             for j in range(3):
-                ray.org[j] = vec_origins[i, j]
-                ray.dir[j] = vec_directions[vd_i, j]
-            ray.tnear = 0.0
-            ray.tfar = tfars[i]
-            ray.geomID = rtcg.RTC_INVALID_GEOMETRY_ID
-            ray.primID = rtcg.RTC_INVALID_GEOMETRY_ID
-            ray.instID = rtcg.RTC_INVALID_GEOMETRY_ID
-            ray.mask = -1
-            ray.time = 0
+                rayhit.ray.org_x = vec_origins[i, 0] if j == 0 else rayhit.ray.org_x
+                rayhit.ray.org_y = vec_origins[i, 1] if j == 1 else rayhit.ray.org_y
+                rayhit.ray.org_z = vec_origins[i, 2] if j == 2 else rayhit.ray.org_z
+                rayhit.ray.dir_x = vec_directions[vd_i, 0] if j == 0 else rayhit.ray.dir_x
+                rayhit.ray.dir_y = vec_directions[vd_i, 1] if j == 1 else rayhit.ray.dir_y
+                rayhit.ray.dir_z = vec_directions[vd_i, 2] if j == 2 else rayhit.ray.dir_z
+            rayhit.ray.tnear = 0.0
+            rayhit.ray.tfar = tfars[i]
+            rayhit.hit.geomID = INVALID_GEOMETRY_ID
+            rayhit.hit.primID = INVALID_GEOMETRY_ID
+            rayhit.hit.instID[0] = INVALID_GEOMETRY_ID
+            rayhit.ray.mask = 0xFFFFFFFF
+            rayhit.ray.time = 0.0
+            rayhit.ray.flags = 0
             vd_i += vd_step
 
             if query_type == intersect or query_type == distance:
-                rtcIntersect(self.scene_i, ray)
+                rtcIntersect1(self.scene_i, &rayhit, NULL)
                 if not output:
                     if query_type == intersect:
-                        intersect_ids[i] = ray.primID
+                        # Convert unsigned INVALID_GEOMETRY_ID to signed -1 for compatibility
+                        intersect_ids[i] = -1 if rayhit.hit.primID == INVALID_GEOMETRY_ID else <int>rayhit.hit.primID
                     else:
-                        tfars[i] = ray.tfar
+                        tfars[i] = rayhit.ray.tfar
                 else:
-                    primID[i] = ray.primID
-                    geomID[i] = ray.geomID
-                    u[i] = ray.u
-                    v[i] = ray.v
-                    tfars[i] = ray.tfar
-                    for j in range(3):
-                        Ng[i, j] = ray.Ng[j]
+                    # Convert unsigned INVALID_GEOMETRY_ID to signed -1 for compatibility
+                    primID[i] = -1 if rayhit.hit.primID == INVALID_GEOMETRY_ID else <int>rayhit.hit.primID
+                    geomID[i] = -1 if rayhit.hit.geomID == INVALID_GEOMETRY_ID else <int>rayhit.hit.geomID
+                    u[i] = rayhit.hit.u
+                    v[i] = rayhit.hit.v
+                    tfars[i] = rayhit.ray.tfar
+                    Ng[i, 0] = rayhit.hit.Ng_x
+                    Ng[i, 1] = rayhit.hit.Ng_y
+                    Ng[i, 2] = rayhit.hit.Ng_z
             else:
-                rtcOccluded(self.scene_i, ray)
-                intersect_ids[i] = ray.geomID
+                rtcOccluded1(self.scene_i, &rayhit.ray, NULL)
+                # In Embree 4, occlusion is signaled by setting ray.tfar to -inf
+                intersect_ids[i] = 0 if rayhit.ray.tfar < 0 else -1
 
         if output:
             return {'u':u, 'v':v, 'Ng': Ng, 'tfar': tfars, 'primID': primID, 'geomID': geomID}
@@ -129,4 +136,4 @@ cdef class EmbreeScene:
                 return intersect_ids
 
     def __dealloc__(self):
-        rtcDeleteScene(self.scene_i)
+        rtcReleaseScene(self.scene_i)

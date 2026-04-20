@@ -49,8 +49,6 @@ cdef class TriangleMesh:
 
     '''
 
-    cdef Vertex* vertices
-    cdef Triangle* indices
     cdef unsigned int mesh
 
     def __init__(self, rtcs.EmbreeScene scene,
@@ -91,12 +89,8 @@ cdef class TriangleMesh:
             triangles[i].v2 = i*3 + 2
 
         rtcg.rtcCommitGeometry(geom)
-        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        self.mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
         rtcg.rtcReleaseGeometry(geom)
-
-        self.vertices = vertices
-        self.indices = triangles
-        self.mesh = mesh
 
     cdef void _build_from_indices(self, rtcs.EmbreeScene scene,
                                   np.ndarray tri_vertices,
@@ -131,12 +125,8 @@ cdef class TriangleMesh:
             triangles[i].v2 = tri_indices[i][2]
 
         rtcg.rtcCommitGeometry(geom)
-        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        self.mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
         rtcg.rtcReleaseGeometry(geom)
-
-        self.vertices = vertices
-        self.indices = triangles
-        self.mesh = mesh
 
 
 cdef class ElementMesh(TriangleMesh):
@@ -220,12 +210,8 @@ cdef class ElementMesh(TriangleMesh):
                 triangles[12*i+j].v2 = quad_indices[i][triangulate_hex[j][2]]
 
         rtcg.rtcCommitGeometry(geom)
-        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        self.mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
         rtcg.rtcReleaseGeometry(geom)
-
-        self.vertices = vertices
-        self.indices = triangles
-        self.mesh = mesh
 
     cdef void _build_from_tetrahedra(self, rtcs.EmbreeScene scene,
                                      np.ndarray tetra_vertices,
@@ -262,9 +248,5 @@ cdef class ElementMesh(TriangleMesh):
                 triangles[4*i+j].v2 = tetra_indices[i][triangulate_tetra[j][2]]
 
         rtcg.rtcCommitGeometry(geom)
-        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        self.mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
         rtcg.rtcReleaseGeometry(geom)
-
-        self.vertices = vertices
-        self.indices = triangles
-        self.mesh = mesh

@@ -161,6 +161,7 @@ cdef unsigned int addCube(rtcs.RTCScene scene_i, rtc.RTCDevice device):
     cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene_i, geom)
     rtcg.rtcReleaseGeometry(geom)
 
+    free(colors)
     return mesh
 
 cdef unsigned int addGroundPlane (rtcs.RTCScene scene_i, rtc.RTCDevice device):

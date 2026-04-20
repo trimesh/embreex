@@ -9,9 +9,6 @@ cdef extern from "embree4/rtcore.h":
     cdef int RTC_VERSION_MINOR
     cdef int RTC_VERSION_PATCH
 
-    void rtcInit(const char* cfg)
-    void rtcExit()
-
     cdef enum RTCError:
         RTC_ERROR_NONE
         RTC_ERROR_UNKNOWN

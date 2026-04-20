@@ -36,6 +36,8 @@ cdef class EmbreeScene:
         rtcSetSceneFlags(self.scene_i, flags)
         self.is_committed = 0
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def run(self, np.ndarray[np.float32_t, ndim=2] vec_origins,
                   np.ndarray[np.float32_t, ndim=2] vec_directions,
                   dists=None,query='INTERSECT',output=None):
@@ -45,9 +47,12 @@ cdef class EmbreeScene:
             self.is_committed = 1
 
         cdef int nv = vec_origins.shape[0]
-        cdef int vd_i, vd_step
+        cdef int i, vd_i, vd_step
         cdef np.ndarray[np.int32_t, ndim=1] intersect_ids
         cdef np.ndarray[np.float32_t, ndim=1] tfars
+        cdef np.ndarray[np.float32_t, ndim=1] u_arr, v_arr
+        cdef np.ndarray[np.float32_t, ndim=2] Ng_arr
+        cdef np.ndarray[np.int32_t, ndim=1] primID_arr, geomID_arr
         cdef rayQueryType query_type
 
         if query == 'INTERSECT':
@@ -58,7 +63,7 @@ cdef class EmbreeScene:
             query_type = distance
 
         else:
-            raise ValueError("Embree ray query type %s not recognized." 
+            raise ValueError("Embree ray query type %s not recognized."
                 "\nAccepted types are (INTERSECT,OCCLUDED,DISTANCE)" % (query))
 
         if dists is None:
@@ -71,12 +76,14 @@ cdef class EmbreeScene:
             tfars = dists
 
         if output:
-            u = np.empty(nv, dtype="float32")
-            v = np.empty(nv, dtype="float32")
-            Ng = np.empty((nv, 3), dtype="float32")
-            primID = np.empty(nv, dtype="int32")
-            geomID = np.empty(nv, dtype="int32")
-        else:
+            u_arr = np.empty(nv, dtype="float32")
+            v_arr = np.empty(nv, dtype="float32")
+            Ng_arr = np.empty((nv, 3), dtype="float32")
+            primID_arr = np.empty(nv, dtype="int32")
+            geomID_arr = np.empty(nv, dtype="int32")
+        # Occluded writes to intersect_ids regardless of output, so always
+        # allocate when that branch is possible.
+        if not output or query_type == occluded:
             intersect_ids = np.empty(nv, dtype="int32")
 
         cdef rtcr.RTCRayHit rayhit
@@ -87,13 +94,12 @@ cdef class EmbreeScene:
         if vec_directions.shape[0] == 1: vd_step = 0
 
         for i in range(nv):
-            for j in range(3):
-                rayhit.ray.org_x = vec_origins[i, 0] if j == 0 else rayhit.ray.org_x
-                rayhit.ray.org_y = vec_origins[i, 1] if j == 1 else rayhit.ray.org_y
-                rayhit.ray.org_z = vec_origins[i, 2] if j == 2 else rayhit.ray.org_z
-                rayhit.ray.dir_x = vec_directions[vd_i, 0] if j == 0 else rayhit.ray.dir_x
-                rayhit.ray.dir_y = vec_directions[vd_i, 1] if j == 1 else rayhit.ray.dir_y
-                rayhit.ray.dir_z = vec_directions[vd_i, 2] if j == 2 else rayhit.ray.dir_z
+            rayhit.ray.org_x = vec_origins[i, 0]
+            rayhit.ray.org_y = vec_origins[i, 1]
+            rayhit.ray.org_z = vec_origins[i, 2]
+            rayhit.ray.dir_x = vec_directions[vd_i, 0]
+            rayhit.ray.dir_y = vec_directions[vd_i, 1]
+            rayhit.ray.dir_z = vec_directions[vd_i, 2]
             rayhit.ray.tnear = 0.0
             rayhit.ray.tfar = tfars[i]
             rayhit.hit.geomID = INVALID_GEOMETRY_ID
@@ -114,21 +120,22 @@ cdef class EmbreeScene:
                         tfars[i] = rayhit.ray.tfar
                 else:
                     # Convert unsigned INVALID_GEOMETRY_ID to signed -1 for compatibility
-                    primID[i] = -1 if rayhit.hit.primID == INVALID_GEOMETRY_ID else <int>rayhit.hit.primID
-                    geomID[i] = -1 if rayhit.hit.geomID == INVALID_GEOMETRY_ID else <int>rayhit.hit.geomID
-                    u[i] = rayhit.hit.u
-                    v[i] = rayhit.hit.v
+                    primID_arr[i] = -1 if rayhit.hit.primID == INVALID_GEOMETRY_ID else <int>rayhit.hit.primID
+                    geomID_arr[i] = -1 if rayhit.hit.geomID == INVALID_GEOMETRY_ID else <int>rayhit.hit.geomID
+                    u_arr[i] = rayhit.hit.u
+                    v_arr[i] = rayhit.hit.v
                     tfars[i] = rayhit.ray.tfar
-                    Ng[i, 0] = rayhit.hit.Ng_x
-                    Ng[i, 1] = rayhit.hit.Ng_y
-                    Ng[i, 2] = rayhit.hit.Ng_z
+                    Ng_arr[i, 0] = rayhit.hit.Ng_x
+                    Ng_arr[i, 1] = rayhit.hit.Ng_y
+                    Ng_arr[i, 2] = rayhit.hit.Ng_z
             else:
                 rtcOccluded1(self.scene_i, &rayhit.ray, NULL)
                 # In Embree 4, occlusion is signaled by setting ray.tfar to -inf
                 intersect_ids[i] = 0 if rayhit.ray.tfar < 0 else -1
 
         if output:
-            return {'u':u, 'v':v, 'Ng': Ng, 'tfar': tfars, 'primID': primID, 'geomID': geomID}
+            return {'u': u_arr, 'v': v_arr, 'Ng': Ng_arr, 'tfar': tfars,
+                    'primID': primID_arr, 'geomID': geomID_arr}
         else:
             if query_type == distance:
                 return tfars

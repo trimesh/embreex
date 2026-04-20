@@ -1,12 +1,12 @@
-# cython: embedsignature=True
+# cython: embedsignature=True, boundscheck=False, wraparound=False, cdivision=True, initializedcheck=False, language_level=3
 # distutils: language=c++
 
 cimport numpy as np
-cimport rtcore as rtc
-cimport rtcore_ray as rtcr
-cimport rtcore_scene as rtcs
-cimport rtcore_geometry as rtcg
-from rtcore cimport Vertex, Triangle
+from . cimport rtcore as rtc
+from . cimport rtcore_ray as rtcr
+from . cimport rtcore_scene as rtcs
+from . cimport rtcore_geometry as rtcg
+from .rtcore cimport Vertex, Triangle
 
 
 cdef extern from "mesh_construction.h":

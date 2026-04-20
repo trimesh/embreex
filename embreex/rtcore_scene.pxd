@@ -2,8 +2,8 @@
 
 cimport cython
 cimport numpy as np
-cimport rtcore as rtc
-cimport rtcore_ray as rtcr
+from . cimport rtcore as rtc
+from . cimport rtcore_ray as rtcr
 
 cdef extern from "embree4/rtcore_scene.h":
 
@@ -36,21 +36,21 @@ cdef extern from "embree4/rtcore_scene.h":
 
     void rtcJoinCommitScene(RTCScene scene)
 
-    void rtcIntersect1(RTCScene scene, RTCRayHit* rayhit, void* args)
+    void rtcIntersect1(RTCScene scene, RTCRayHit* rayhit, void* args) nogil
 
-    void rtcIntersect4(const void* valid, RTCScene scene, RTCRayHit4* rayhit, void* args)
+    void rtcIntersect4(const void* valid, RTCScene scene, RTCRayHit4* rayhit, void* args) nogil
 
-    void rtcIntersect8(const void* valid, RTCScene scene, RTCRayHit8* rayhit, void* args)
+    void rtcIntersect8(const void* valid, RTCScene scene, RTCRayHit8* rayhit, void* args) nogil
 
-    void rtcIntersect16(const void* valid, RTCScene scene, RTCRayHit16* rayhit, void* args)
+    void rtcIntersect16(const void* valid, RTCScene scene, RTCRayHit16* rayhit, void* args) nogil
 
-    void rtcOccluded1(RTCScene scene, RTCRay* ray, void* args)
+    void rtcOccluded1(RTCScene scene, RTCRay* ray, void* args) nogil
 
-    void rtcOccluded4(const void* valid, RTCScene scene, RTCRay4* ray, void* args)
+    void rtcOccluded4(const void* valid, RTCScene scene, RTCRay4* ray, void* args) nogil
 
-    void rtcOccluded8(const void* valid, RTCScene scene, RTCRay8* ray, void* args)
+    void rtcOccluded8(const void* valid, RTCScene scene, RTCRay8* ray, void* args) nogil
 
-    void rtcOccluded16(const void* valid, RTCScene scene, RTCRay16* ray, void* args)
+    void rtcOccluded16(const void* valid, RTCScene scene, RTCRay16* ray, void* args) nogil
 
     void rtcReleaseScene(RTCScene scene)
     

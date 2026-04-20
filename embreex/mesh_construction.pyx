@@ -1,12 +1,12 @@
-# cython: embedsignature=True
+# cython: embedsignature=True, boundscheck=False, wraparound=False, cdivision=True, initializedcheck=False, language_level=3
 # distutils: language=c++
 
 cimport numpy as np
-cimport rtcore as rtc
-cimport rtcore_ray as rtcr
-cimport rtcore_scene as rtcs
-cimport rtcore_geometry as rtcg
-from rtcore cimport Vertex, Triangle
+from . cimport rtcore as rtc
+from . cimport rtcore_ray as rtcr
+from . cimport rtcore_scene as rtcs
+from . cimport rtcore_geometry as rtcg
+from .rtcore cimport Vertex, Triangle
 
 
 cdef extern from "mesh_construction.h":
@@ -49,8 +49,6 @@ cdef class TriangleMesh:
 
     '''
 
-    cdef Vertex* vertices
-    cdef Triangle* indices
     cdef unsigned int mesh
 
     def __init__(self, rtcs.EmbreeScene scene,
@@ -91,12 +89,8 @@ cdef class TriangleMesh:
             triangles[i].v2 = i*3 + 2
 
         rtcg.rtcCommitGeometry(geom)
-        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        self.mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
         rtcg.rtcReleaseGeometry(geom)
-
-        self.vertices = vertices
-        self.indices = triangles
-        self.mesh = mesh
 
     cdef void _build_from_indices(self, rtcs.EmbreeScene scene,
                                   np.ndarray tri_vertices,
@@ -131,12 +125,8 @@ cdef class TriangleMesh:
             triangles[i].v2 = tri_indices[i][2]
 
         rtcg.rtcCommitGeometry(geom)
-        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        self.mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
         rtcg.rtcReleaseGeometry(geom)
-
-        self.vertices = vertices
-        self.indices = triangles
-        self.mesh = mesh
 
 
 cdef class ElementMesh(TriangleMesh):
@@ -220,12 +210,8 @@ cdef class ElementMesh(TriangleMesh):
                 triangles[12*i+j].v2 = quad_indices[i][triangulate_hex[j][2]]
 
         rtcg.rtcCommitGeometry(geom)
-        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        self.mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
         rtcg.rtcReleaseGeometry(geom)
-
-        self.vertices = vertices
-        self.indices = triangles
-        self.mesh = mesh
 
     cdef void _build_from_tetrahedra(self, rtcs.EmbreeScene scene,
                                      np.ndarray tetra_vertices,
@@ -262,9 +248,5 @@ cdef class ElementMesh(TriangleMesh):
                 triangles[4*i+j].v2 = tetra_indices[i][triangulate_tetra[j][2]]
 
         rtcg.rtcCommitGeometry(geom)
-        cdef unsigned int mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
+        self.mesh = rtcg.rtcAttachGeometry(scene.scene_i, geom)
         rtcg.rtcReleaseGeometry(geom)
-
-        self.vertices = vertices
-        self.indices = triangles
-        self.mesh = mesh

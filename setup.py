@@ -29,7 +29,7 @@ def ext_modules():
         libraries = ['/opt/local/lib',
                      os.path.join(_cwd, 'embree4', 'lib')]
 
-    ext_modules = cythonize("embreex/*.pyx", include_path=includes, language_level=2)
+    ext_modules = cythonize("embreex/*.pyx", include_path=includes, language_level=3)
     for ext in ext_modules:
         ext.include_dirs = includes
         ext.library_dirs = libraries

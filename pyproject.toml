@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "embreex"
 requires-python = ">=3.8"
-version = "4.4.0rc0"
+version = "4.4.0rc1"
 
 dependencies = ["numpy"]
 description = "Python binding for Intel's Embree ray engine"
@@ -48,6 +48,4 @@ repair-wheel-command = "DYLD_LIBRARY_PATH=embree4/lib delocate-listdeps -a {whee
 repair-wheel-command = "LD_LIBRARY_PATH=`realpath embree4/lib`; auditwheel repair -w {dest_dir} {wheel}"
 
 [tool.ruff.lint]
-select = ["E", "F", # the default rules
-       "B"     # pass bugbear
-       	  ]
+select = ["E", "F", "B", "UP" ]

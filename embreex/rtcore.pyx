@@ -1,3 +1,4 @@
+# cython: boundscheck=False, wraparound=False, cdivision=True, initializedcheck=False, language_level=3
 # distutils: language=c++
 
 import logging

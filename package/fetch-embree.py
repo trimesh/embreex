@@ -212,14 +212,14 @@ def is_current_platform(platform: str, architecture: Optional[str]) -> bool:
 
     if architecture is not None:
         # Check for cibuildwheel target architecture first
-        target_arch = os.environ.get('ARCHFLAGS', '')
-        if 'arm64' in target_arch:
-            machine = 'arm64'
-        elif 'x86_64' in target_arch:
-            machine = 'x86_64'
+        target_arch = os.environ.get("ARCHFLAGS", "")
+        if "arm64" in target_arch:
+            machine = "arm64"
+        elif "x86_64" in target_arch:
+            machine = "x86_64"
         else:
             machine = uname().machine.lower()
-        
+
         if architecture.lower() not in machine.lower():
             return False
 

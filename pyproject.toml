@@ -27,7 +27,7 @@ include-package-data = false
 find = {namespaces = false}
 
 [tool.setuptools.package-data]
-embreex = ["*.pxd"]
+embreex = ["*.pxd", "*.pyi", "py.typed"]
 
 [tool.cibuildwheel]
 skip =  "*i686 *-win32 *musllinux*"

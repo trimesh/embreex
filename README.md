@@ -19,6 +19,29 @@ The main goal of this fork is to provide wheels for the original project:
 pip install embreex
 ```
 
+## Development
+
+If you are contributing to this project or modifying Cython bindings, you can auto-generate type stubs and run static validation without needing to compile the extension library or install standard C++ compilation tooling.
+
+### Generating Type Stubs
+
+When you modify Cython files (`.pyx` or `.pxd`), auto-generate and synchronize the `.pyi` type stubs by running:
+```bash
+python package/generate_stubs.py
+```
+
+### Running Tests and Type Validation
+
+Verify that your type stubs are completely up to date and that static type checking passes:
+
+```bash
+# 1. Run the stub synchronization test
+PYTHONPATH=. pytest tests/test_stubs.py
+
+# 2. Run static type analysis
+mypy
+```
+
 ## Alternatives
 
 The original project is [available on conda-forge](https://anaconda.org/conda-forge/pyembree/files) for many versons of Python. For wheel-based options currently on PyPi there are:

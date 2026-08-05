@@ -11,7 +11,19 @@ from . cimport rtcore_ray as rtcr
 from . cimport rtcore_geometry as rtcg
 
 
+cdef extern from "tbb_parallel.h" nogil:
+    ctypedef void (*embreex_range_fn)(void* ctx, size_t begin, size_t end) noexcept nogil
+
+    void embreex_parallel_for(size_t n, size_t grain, int nthreads,
+                              embreex_range_fn fn, void* ctx) except +
+
+
 log = logging.getLogger('embreex')
+
+# TBB range divisibility threshold, in rays. Value taken from Open3D; not
+# profiled here.
+cdef size_t _TBB_GRAIN_SIZE = 1024
+
 
 cdef void error_printer(void* userPtr, const rtc.RTCError code, const char *_str) noexcept:
     """
@@ -22,7 +34,7 @@ cdef void error_printer(void* userPtr, const rtc.RTCError code, const char *_str
     log.error("ERROR MESSAGE: %s" % _str)
 
 
-# Raw buffers and byte strides let workers traverse strided inputs without
+# Raw buffers and byte strides let TBB workers traverse strided inputs without
 # accessing Python objects; outputs are contiguous.
 cdef struct RayJob:
     RTCScene scene
@@ -100,6 +112,20 @@ cdef void _cast_range(void* ctx, size_t begin, size_t end) noexcept nogil:
             j.intersect_ids[i] = 0 if rayhit.ray.tfar < 0 else -1
 
 
+cdef bint _ray_buffers_are_thread_safe(int nv,
+                                       Py_ssize_t org_s0, Py_ssize_t dir_s0,
+                                       Py_ssize_t tfar_s0, bint user_dists) nogil:
+    if nv <= 1:
+        return True
+    if org_s0 < <Py_ssize_t>sizeof(float):
+        return False
+    if dir_s0 < <Py_ssize_t>sizeof(float):
+        return False
+    if user_dists and tfar_s0 < <Py_ssize_t>sizeof(float):
+        return False
+    return True
+
+
 cdef class EmbreeScene:
     def __init__(self, rtc.EmbreeDevice device=None, robust=True):
         if device is None:
@@ -117,12 +143,7 @@ cdef class EmbreeScene:
 
     def run(self, np.ndarray[np.float32_t, ndim=2] vec_origins,
                   np.ndarray[np.float32_t, ndim=2] vec_directions,
-                  dists=None, query='INTERSECT', output=None):
-
-        if self.is_committed == 0:
-            rtcCommitScene(self.scene_i)
-            self.is_committed = 1
-
+                  dists=None, query='INTERSECT', output=None, threads=0):
         cdef int nv = vec_origins.shape[0]
         cdef np.ndarray[np.int32_t, ndim=1] intersect_ids
         cdef np.ndarray[np.float32_t, ndim=1] tfars
@@ -130,6 +151,16 @@ cdef class EmbreeScene:
         cdef np.ndarray[np.float32_t, ndim=2] Ng_arr
         cdef np.ndarray[np.int32_t, ndim=1] primID_arr, geomID_arr
         cdef rayQueryType query_type
+        cdef int nthreads
+        cdef np.ndarray[np.float32_t, ndim=1] work_tfars
+        cdef bint user_dists = False
+        cdef bint copy_dists_back = False
+
+        if not isinstance(threads, numbers.Integral):
+            raise TypeError("`threads` must be an integer, got %r" % (threads,))
+        nthreads = int(threads)
+        if nthreads < 0:
+            raise ValueError("`threads` must be >= 0, got %r" % (threads,))
 
         if query == 'INTERSECT':
             query_type = intersect
@@ -148,6 +179,7 @@ cdef class EmbreeScene:
             tfars = np.empty(nv, 'float32')
             tfars.fill(dists)
         else:
+            user_dists = True
             tfars = dists
 
         if output:
@@ -162,16 +194,43 @@ cdef class EmbreeScene:
             intersect_ids = np.empty(nv, dtype="int32")
 
         cdef RayJob job
+        job.org_s0 = np.PyArray_STRIDES(vec_origins)[0]
+        job.dir_s0 = np.PyArray_STRIDES(vec_directions)[0]
+        job.tfar_s0 = np.PyArray_STRIDES(tfars)[0]
+
+        if user_dists and nv > 1:
+            if tfars.shape[0] != nv:
+                raise ValueError(
+                    "dists must have one entry per ray for threaded queries"
+                )
+
+        if not _ray_buffers_are_thread_safe(
+            nv, job.org_s0, job.dir_s0, job.tfar_s0, user_dists
+        ):
+            raise ValueError(
+                "threaded queries require distinct per-ray rows in origins, "
+                "directions, and dists"
+            )
+
+        if user_dists and nv > 1 and not np.PyArray_ISCONTIGUOUS(tfars):
+            work_tfars = np.ascontiguousarray(tfars)
+            copy_dists_back = True
+        else:
+            work_tfars = tfars
+
+        # Commit while holding the GIL; Embree forbids commit/traversal overlap.
+        if self.is_committed == 0:
+            rtcCommitScene(self.scene_i)
+            self.is_committed = 1
+
         job.scene = self.scene_i
         job.org = <char*>np.PyArray_DATA(vec_origins)
-        job.org_s0 = np.PyArray_STRIDES(vec_origins)[0]
         job.org_s1 = np.PyArray_STRIDES(vec_origins)[1]
         job.dir = <char*>np.PyArray_DATA(vec_directions)
-        job.dir_s0 = np.PyArray_STRIDES(vec_directions)[0]
         job.dir_s1 = np.PyArray_STRIDES(vec_directions)[1]
         job.direction_row_step = 0 if vec_directions.shape[0] == 1 else 1
-        job.tfar = <char*>np.PyArray_DATA(tfars)
-        job.tfar_s0 = np.PyArray_STRIDES(tfars)[0]
+        job.tfar = <char*>np.PyArray_DATA(work_tfars)
+        job.tfar_s0 = np.PyArray_STRIDES(work_tfars)[0]
         job.query_type = <int>query_type
         job.use_output = bool(output)
         job.intersect_ids = <int*>np.PyArray_DATA(intersect_ids) if (not output or query_type == occluded) else NULL
@@ -188,15 +247,20 @@ cdef class EmbreeScene:
             job.primID_arr = NULL
             job.geomID_arr = NULL
 
-        with nogil:
-            _cast_range(<void*>&job, 0, <size_t>nv)
+        if nv > 0:
+            with nogil:
+                embreex_parallel_for(<size_t>nv, _TBB_GRAIN_SIZE, nthreads,
+                                     _cast_range, <void*>&job)
+
+        if copy_dists_back:
+            dists[:] = work_tfars
 
         if output:
-            return {'u': u_arr, 'v': v_arr, 'Ng': Ng_arr, 'tfar': tfars,
+            return {'u': u_arr, 'v': v_arr, 'Ng': Ng_arr, 'tfar': work_tfars,
                     'primID': primID_arr, 'geomID': geomID_arr}
         else:
             if query_type == distance:
-                return tfars
+                return dists if user_dists else work_tfars
             else:
                 return intersect_ids
 

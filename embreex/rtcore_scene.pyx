@@ -22,6 +22,84 @@ cdef void error_printer(void* userPtr, const rtc.RTCError code, const char *_str
     log.error("ERROR MESSAGE: %s" % _str)
 
 
+# Raw buffers and byte strides let workers traverse strided inputs without
+# accessing Python objects; outputs are contiguous.
+cdef struct RayJob:
+    RTCScene scene
+    char* org
+    Py_ssize_t org_s0
+    Py_ssize_t org_s1
+    char* dir
+    Py_ssize_t dir_s0
+    Py_ssize_t dir_s1
+    int direction_row_step
+    char* tfar
+    Py_ssize_t tfar_s0
+    int* intersect_ids
+    float* u_arr
+    float* v_arr
+    float* Ng_arr
+    int* primID_arr
+    int* geomID_arr
+    int query_type
+    bint use_output
+
+
+cdef void _cast_range(void* ctx, size_t begin, size_t end) noexcept nogil:
+    """Trace rays in the half-open range [begin, end)."""
+    cdef RayJob* j = <RayJob*>ctx
+    cdef rtcr.RTCRayHit rayhit
+    cdef unsigned int INVALID_GEOMETRY_ID = 0xFFFFFFFF
+    cdef size_t i
+    cdef Py_ssize_t vd_i
+    cdef char* origin_ptr
+    cdef char* direction_ptr
+    cdef char* distance_ptr
+
+    for i in range(begin, end):
+        origin_ptr = j.org + <Py_ssize_t>i * j.org_s0
+        # Broadcast a single direction row across all origins.
+        vd_i = <Py_ssize_t>i * j.direction_row_step
+        direction_ptr = j.dir + vd_i * j.dir_s0
+        distance_ptr = j.tfar + <Py_ssize_t>i * j.tfar_s0
+
+        rayhit.ray.org_x = (<float*>origin_ptr)[0]
+        rayhit.ray.org_y = (<float*>(origin_ptr + j.org_s1))[0]
+        rayhit.ray.org_z = (<float*>(origin_ptr + 2 * j.org_s1))[0]
+        rayhit.ray.dir_x = (<float*>direction_ptr)[0]
+        rayhit.ray.dir_y = (<float*>(direction_ptr + j.dir_s1))[0]
+        rayhit.ray.dir_z = (<float*>(direction_ptr + 2 * j.dir_s1))[0]
+        rayhit.ray.tnear = 0.0
+        rayhit.ray.tfar = (<float*>distance_ptr)[0]
+        rayhit.hit.geomID = INVALID_GEOMETRY_ID
+        rayhit.hit.primID = INVALID_GEOMETRY_ID
+        rayhit.hit.instID[0] = INVALID_GEOMETRY_ID
+        rayhit.ray.mask = 0xFFFFFFFF
+        rayhit.ray.time = 0.0
+        rayhit.ray.flags = 0
+
+        if j.query_type == <int>intersect or j.query_type == <int>distance:
+            rtcIntersect1(j.scene, &rayhit, NULL)
+            if not j.use_output:
+                if j.query_type == <int>intersect:
+                    j.intersect_ids[i] = -1 if rayhit.hit.primID == INVALID_GEOMETRY_ID else <int>rayhit.hit.primID
+                else:
+                    (<float*>distance_ptr)[0] = rayhit.ray.tfar
+            else:
+                j.primID_arr[i] = -1 if rayhit.hit.primID == INVALID_GEOMETRY_ID else <int>rayhit.hit.primID
+                j.geomID_arr[i] = -1 if rayhit.hit.geomID == INVALID_GEOMETRY_ID else <int>rayhit.hit.geomID
+                j.u_arr[i] = rayhit.hit.u
+                j.v_arr[i] = rayhit.hit.v
+                (<float*>distance_ptr)[0] = rayhit.ray.tfar
+                j.Ng_arr[3 * i + 0] = rayhit.hit.Ng_x
+                j.Ng_arr[3 * i + 1] = rayhit.hit.Ng_y
+                j.Ng_arr[3 * i + 2] = rayhit.hit.Ng_z
+        else:
+            rtcOccluded1(j.scene, &rayhit.ray, NULL)
+            # In Embree 4, occlusion is signaled by setting ray.tfar to -inf
+            j.intersect_ids[i] = 0 if rayhit.ray.tfar < 0 else -1
+
+
 cdef class EmbreeScene:
     def __init__(self, rtc.EmbreeDevice device=None, robust=True):
         if device is None:
@@ -39,14 +117,13 @@ cdef class EmbreeScene:
 
     def run(self, np.ndarray[np.float32_t, ndim=2] vec_origins,
                   np.ndarray[np.float32_t, ndim=2] vec_directions,
-                  dists=None,query='INTERSECT',output=None):
+                  dists=None, query='INTERSECT', output=None):
 
         if self.is_committed == 0:
             rtcCommitScene(self.scene_i)
             self.is_committed = 1
 
         cdef int nv = vec_origins.shape[0]
-        cdef int i, vd_i, vd_step
         cdef np.ndarray[np.int32_t, ndim=1] intersect_ids
         cdef np.ndarray[np.float32_t, ndim=1] tfars
         cdef np.ndarray[np.float32_t, ndim=1] u_arr, v_arr
@@ -60,7 +137,6 @@ cdef class EmbreeScene:
             query_type = occluded
         elif query == 'DISTANCE':
             query_type = distance
-
         else:
             raise ValueError("Embree ray query type %s not recognized."
                 "\nAccepted types are (INTERSECT,OCCLUDED,DISTANCE)" % (query))
@@ -85,52 +161,35 @@ cdef class EmbreeScene:
         if not output or query_type == occluded:
             intersect_ids = np.empty(nv, dtype="int32")
 
-        cdef rtcr.RTCRayHit rayhit
-        cdef unsigned int INVALID_GEOMETRY_ID = 0xFFFFFFFF
-        cdef bint use_output = bool(output)
-        vd_i = 0
-        vd_step = 1
-        # If vec_directions is 1 long, we won't be updating it.
-        if vec_directions.shape[0] == 1: vd_step = 0
+        cdef RayJob job
+        job.scene = self.scene_i
+        job.org = <char*>np.PyArray_DATA(vec_origins)
+        job.org_s0 = np.PyArray_STRIDES(vec_origins)[0]
+        job.org_s1 = np.PyArray_STRIDES(vec_origins)[1]
+        job.dir = <char*>np.PyArray_DATA(vec_directions)
+        job.dir_s0 = np.PyArray_STRIDES(vec_directions)[0]
+        job.dir_s1 = np.PyArray_STRIDES(vec_directions)[1]
+        job.direction_row_step = 0 if vec_directions.shape[0] == 1 else 1
+        job.tfar = <char*>np.PyArray_DATA(tfars)
+        job.tfar_s0 = np.PyArray_STRIDES(tfars)[0]
+        job.query_type = <int>query_type
+        job.use_output = bool(output)
+        job.intersect_ids = <int*>np.PyArray_DATA(intersect_ids) if (not output or query_type == occluded) else NULL
+        if output:
+            job.u_arr = <float*>np.PyArray_DATA(u_arr)
+            job.v_arr = <float*>np.PyArray_DATA(v_arr)
+            job.Ng_arr = <float*>np.PyArray_DATA(Ng_arr)
+            job.primID_arr = <int*>np.PyArray_DATA(primID_arr)
+            job.geomID_arr = <int*>np.PyArray_DATA(geomID_arr)
+        else:
+            job.u_arr = NULL
+            job.v_arr = NULL
+            job.Ng_arr = NULL
+            job.primID_arr = NULL
+            job.geomID_arr = NULL
 
         with nogil:
-            for i in range(nv):
-                rayhit.ray.org_x = vec_origins[i, 0]
-                rayhit.ray.org_y = vec_origins[i, 1]
-                rayhit.ray.org_z = vec_origins[i, 2]
-                rayhit.ray.dir_x = vec_directions[vd_i, 0]
-                rayhit.ray.dir_y = vec_directions[vd_i, 1]
-                rayhit.ray.dir_z = vec_directions[vd_i, 2]
-                rayhit.ray.tnear = 0.0
-                rayhit.ray.tfar = tfars[i]
-                rayhit.hit.geomID = INVALID_GEOMETRY_ID
-                rayhit.hit.primID = INVALID_GEOMETRY_ID
-                rayhit.hit.instID[0] = INVALID_GEOMETRY_ID
-                rayhit.ray.mask = 0xFFFFFFFF
-                rayhit.ray.time = 0.0
-                rayhit.ray.flags = 0
-                vd_i += vd_step
-
-                if query_type == intersect or query_type == distance:
-                    rtcIntersect1(self.scene_i, &rayhit, NULL)
-                    if not use_output:
-                        if query_type == intersect:
-                            intersect_ids[i] = -1 if rayhit.hit.primID == INVALID_GEOMETRY_ID else <int>rayhit.hit.primID
-                        else:
-                            tfars[i] = rayhit.ray.tfar
-                    else:
-                        primID_arr[i] = -1 if rayhit.hit.primID == INVALID_GEOMETRY_ID else <int>rayhit.hit.primID
-                        geomID_arr[i] = -1 if rayhit.hit.geomID == INVALID_GEOMETRY_ID else <int>rayhit.hit.geomID
-                        u_arr[i] = rayhit.hit.u
-                        v_arr[i] = rayhit.hit.v
-                        tfars[i] = rayhit.ray.tfar
-                        Ng_arr[i, 0] = rayhit.hit.Ng_x
-                        Ng_arr[i, 1] = rayhit.hit.Ng_y
-                        Ng_arr[i, 2] = rayhit.hit.Ng_z
-                else:
-                    rtcOccluded1(self.scene_i, &rayhit.ray, NULL)
-                    # In Embree 4, occlusion is signaled by setting ray.tfar to -inf
-                    intersect_ids[i] = 0 if rayhit.ray.tfar < 0 else -1
+            _cast_range(<void*>&job, 0, <size_t>nv)
 
         if output:
             return {'u': u_arr, 'v': v_arr, 'Ng': Ng_arr, 'tfar': tfars,

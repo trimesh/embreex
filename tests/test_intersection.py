@@ -218,6 +218,154 @@ class TestOccludedQuery(TestCase):
         self.assertEqual(res[3], -1)
 
 
+class TestThreadedQueries(TestCase):
+    """Parity tests across Open3D-style thread counts (0 = automatic)."""
+
+    def setUp(self):
+        rng = np.random.default_rng(0)
+        scene = rtcs.EmbreeScene()
+        TriangleMesh(scene, np.array(xplane(7.0), "float32"))
+        self.scene = scene
+        n = 20_000
+        self.origins = np.zeros((n, 3), dtype="float32")
+        self.origins[:, 0] = 0.1
+        # Include both hits and misses across multiple chunks.
+        self.origins[:, 1] = rng.uniform(-3.0, 3.0, n).astype("float32")
+        self.origins[:, 2] = rng.uniform(-3.0, 3.0, n).astype("float32")
+        self.dirs = np.zeros((n, 3), dtype="float32")
+        self.dirs[:, 0] = 1.0
+
+    def test_threads_match_serial(self):
+        for query in ("INTERSECT", "OCCLUDED", "DISTANCE"):
+            ref = self.scene.run(self.origins, self.dirs, query=query, threads=1)
+            for threads in (0, -1, -2, 2, 3, 8):
+                got = self.scene.run(
+                    self.origins, self.dirs, query=query, threads=threads
+                )
+                np.testing.assert_array_equal(ref, got, err_msg=f"{query} t={threads}")
+
+    def test_threads_match_serial_output_dict(self):
+        ref = self.scene.run(self.origins, self.dirs, output=True, threads=1)
+        hit = ref["primID"] != -1
+        # Guard against a fixture that exercises only one output branch.
+        self.assertTrue(hit.any() and not hit.all())
+        for threads in (0, -1, -2, 2, 3, 8):
+            got = self.scene.run(
+                self.origins, self.dirs, output=True, threads=threads
+            )
+            for key in ("primID", "geomID", "tfar", "u", "v", "Ng"):
+                np.testing.assert_array_equal(
+                    ref[key], got[key], err_msg=f"{key} t={threads}"
+                )
+
+    def test_threads_output_dict_is_repeatable(self):
+        a = self.scene.run(self.origins, self.dirs, output=True, threads=8)
+        b = self.scene.run(self.origins, self.dirs, output=True, threads=8)
+        for key in ("primID", "geomID", "tfar", "u", "v", "Ng"):
+            np.testing.assert_array_equal(a[key], b[key], err_msg=key)
+
+    def test_threads_broadcast_direction(self):
+        repeated_dirs = np.tile(self.dirs[:1], (len(self.origins), 1))
+        ref = self.scene.run(self.origins, repeated_dirs, threads=1)
+        broadcast = self.scene.run(self.origins, self.dirs[:1], threads=1)
+        threaded = self.scene.run(self.origins, self.dirs[:1], threads=8)
+        np.testing.assert_array_equal(ref, broadcast)
+        np.testing.assert_array_equal(ref, threaded)
+
+    def test_threads_non_contiguous_input(self):
+        origins = self.origins[::3]
+        directions = self.dirs[::3]
+        ref = self.scene.run(
+            np.ascontiguousarray(origins),
+            np.ascontiguousarray(directions),
+            threads=1,
+        )
+        np.testing.assert_array_equal(
+            ref, self.scene.run(origins, directions, threads=1)
+        )
+        np.testing.assert_array_equal(
+            ref, self.scene.run(origins, directions, threads=8)
+        )
+
+    def test_threads_degenerate_sizes(self):
+        for n in (0, 1, 2, 1023, 1024, 1025):
+            origins, directions = self.origins[:n], self.dirs[:n]
+            np.testing.assert_array_equal(
+                self.scene.run(origins, directions, threads=1),
+                self.scene.run(origins, directions, threads=8),
+                err_msg=str(n),
+            )
+
+    def test_threads_dists_written_in_place(self):
+        ref = np.full(len(self.origins), 20.0, dtype="float32")
+        got = ref.copy()
+        self.scene.run(self.origins, self.dirs, dists=ref, query="DISTANCE", threads=1)
+        self.scene.run(self.origins, self.dirs, dists=got, query="DISTANCE", threads=8)
+        np.testing.assert_array_equal(ref, got)
+
+    def test_threads_non_contiguous_dists(self):
+        dists = np.full(len(self.origins) * 2, 20.0, dtype="float32")[::2]
+        expected = dists.copy()
+        self.scene.run(
+            self.origins, self.dirs, dists=expected, query="DISTANCE", threads=1
+        )
+        work = dists.copy()
+        self.scene.run(self.origins, self.dirs, dists=work, query="DISTANCE", threads=8)
+        np.testing.assert_array_equal(expected, work)
+
+    def test_threads_non_integer_raises(self):
+        for value in (-0.5, 1.9, "3"):
+            with self.assertRaises(TypeError):
+                self.scene.run(self.origins, self.dirs, threads=value)
+
+    def test_invalid_threads_leaves_scene_usable(self):
+        scene = rtcs.EmbreeScene()
+        empty = np.empty((0, 3), dtype="float32")
+        with self.assertRaises(TypeError):
+            scene.run(empty, empty, threads=1.5)
+        TriangleMesh(scene, np.array(xplane(7.0), "float32"))
+        origins = np.array([[0.1, 0.0, 0.0]], dtype="float32")
+        directions = np.array([[1.0, 0.0, 0.0]], dtype="float32")
+        np.testing.assert_array_equal(scene.run(origins, directions), [0])
+
+    def test_threads_overlapping_dists_rejected(self):
+        dists = np.broadcast_to(np.array([20.0], dtype="float32"), (2,))
+        with self.assertRaises(ValueError):
+            self.scene.run(
+                self.origins[:2],
+                self.dirs[:2],
+                dists=dists,
+                query="DISTANCE",
+                threads=2,
+            )
+
+    def test_threads_mismatched_dists_length_rejected(self):
+        dists = np.array([20.0], dtype="float32")
+        with self.assertRaises(ValueError):
+            self.scene.run(
+                self.origins[:2],
+                self.dirs[:2],
+                dists=dists,
+                query="DISTANCE",
+                threads=2,
+            )
+
+    def test_threads_from_python_threads(self):
+        """Concurrent `run()` calls on one scene must not interfere."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        ref = self.scene.run(self.origins, self.dirs)
+        with ThreadPoolExecutor(4) as pool:
+            got = list(
+                pool.map(
+                    lambda _: self.scene.run(self.origins, self.dirs, threads=4),
+                    range(8),
+                )
+            )
+        for i, g in enumerate(got):
+            np.testing.assert_array_equal(ref, g, err_msg=str(i))
+
+
 if __name__ == "__main__":
     from unittest import main
 

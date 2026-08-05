@@ -198,9 +198,10 @@ def is_current_platform(platform: str, architecture: Optional[str]) -> bool:
     Parameters
     ----------
     platform
-      Checked against `platform.system`
+      Checked against `platform.system`, or `"any"` for a
+      platform-independent resource such as a source archive.
     architecture
-      Checked against `platform.uname.machine`
+      Checked against `platform.uname.machine`, or `None` for any.
 
     Returns
     -------
@@ -209,6 +210,9 @@ def is_current_platform(platform: str, architecture: Optional[str]) -> bool:
 
     """
     # 'linux', 'darwin', 'windows'
+
+    if platform == "any":
+        return True
 
     if architecture is not None:
         # Check for cibuildwheel target architecture first
@@ -266,5 +270,6 @@ if __name__ == "__main__":
             subset = option.copy()
             subset.pop("name")
             subset.pop("platform")
-            subset.pop("architecture")
+            subset.pop("architecture", None)
+            subset.pop("comment", None)
             handle_fetch(**subset)

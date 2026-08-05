@@ -44,5 +44,20 @@
     "sha256": "d951e5e6bd295c54cdd66be9cdb44a4e8c42fb38a99f94f79305e48765fc3454",
     "target": "../embree4",
     "url": "https://github.com/RenderKit/embree/releases/download/v4.4.0/embree-4.4.0.x64.windows.zip"
+  },
+  {
+    "comment": "Headers only; pin no newer than the oldest bundled TBB runtime (2021.11 for embree 4.4.0). Revalidate when updating Embree.",
+    "extract_skip": [
+      ".*", ".github/*", "*.md", "*.bazel", "*.bazelrc", "*.bazelversion",
+      "CMakeLists.txt", "third-party-programs.txt",
+      "cmake/*", "doc/*", "examples/*", "integration/*", "python/*",
+      "src/*", "test/*"
+    ],
+    "name": "tbb-headers",
+    "platform": "any",
+    "sha256": "782ce0cab62df9ea125cdea253a50534862b563f1d85d4cda7ad4e77550ac363",
+    "strip_components": 1,
+    "target": "../tbb",
+    "url": "https://github.com/uxlfoundation/oneTBB/archive/refs/tags/v2021.11.0.tar.gz"
   }
 ]

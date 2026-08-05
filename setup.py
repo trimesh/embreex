@@ -13,12 +13,17 @@ _cwd = os.path.abspath(os.path.expanduser(os.path.dirname(__file__)))
 
 def ext_modules():
     """Generate a list of extension modules for embreex."""
+    # Fetch oneTBB headers separately; Embree's bundle contains only the runtime.
+    tbb_include = os.path.join(_cwd, "tbb", "include")
+    cxx_std = ["-std=c++11"] if os.name != "nt" else ["/std:c++14"]
+
     if os.name == "nt":
         # embree search locations on windows
         includes = [
             get_include(),
             "c:/Program Files/Intel/Embree4/include",
             os.path.join(_cwd, "embree4", "include"),
+            tbb_include,
         ]
         libraries = [
             "c:/Program Files/Intel/Embree4/lib",
@@ -30,6 +35,7 @@ def ext_modules():
             get_include(),
             "/opt/local/include",
             os.path.join(_cwd, "embree4", "include"),
+            tbb_include,
         ]
         libraries = ["/opt/local/lib", os.path.join(_cwd, "embree4", "lib")]
 
@@ -37,16 +43,21 @@ def ext_modules():
     for ext in ext_modules:
         ext.include_dirs = includes
         ext.library_dirs = libraries
+        ext.extra_compile_args = getattr(ext, "extra_compile_args", []) + cxx_std
         # on macOS with Embree 4.x, link against the versioned library directly
         if sys.platform == "darwin":
-            ext.libraries = ["embree4.4"]
+            # `libtbb.dylib` is a symlink created by `package/embree.json`
+            ext.libraries = ["embree4.4", "tbb"]
             # Add rpath to find libembree4 during build and set loader_path for runtime
             ext.extra_link_args = [
                 "-Wl,-rpath,@loader_path",
                 "-Wl,-rpath," + os.path.join(_cwd, "embree4", "lib"),
             ]
+        elif os.name == "nt":
+            # the import library in the embree bundle is `tbb12.lib`
+            ext.libraries = ["embree4", "tbb12"]
         else:
-            ext.libraries = ["embree4"]
+            ext.libraries = ["embree4", "tbb"]
 
     return ext_modules
 

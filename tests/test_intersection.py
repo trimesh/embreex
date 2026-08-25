@@ -205,6 +205,47 @@ class TestIntersectionHexahedron(TestCase):
         self.assertTrue(np.allclose([0.8, 0.6], v))
 
 
+class TestMissedRayOutput(TestCase):
+    def setUp(self):
+        triangles = np.array(xplane(7.0), "float32")
+        self.scene = rtcs.EmbreeScene()
+        TriangleMesh(self.scene, triangles)
+        # rays 0-2 hit the plane, ray 3 (y = -8.2) misses it
+        self.origins, self.dirs = define_rays_origins_and_directions()
+
+    def test_missed_rays_report_zero_hit_attributes(self):
+        """A ray that hits nothing must not report the previous ray's surface.
+
+        Embree fills the hit fields only on a hit, and the `RTCRayHit` is reused
+        for every ray in the batch, so without explicitly clearing them a missed
+        ray inherits whatever the last hit left behind.
+        """
+        res = self.scene.run(self.origins, self.dirs, output=1)
+
+        miss = res["primID"] == -1
+        self.assertEqual(miss.sum(), 1)
+        self.assertTrue(np.all(res["geomID"][miss] == -1))
+        self.assertTrue(np.all(res["u"][miss] == 0.0))
+        self.assertTrue(np.all(res["v"][miss] == 0.0))
+        self.assertTrue(np.all(res["Ng"][miss] == 0.0))
+
+        # the hits must still carry real data
+        self.assertTrue(np.all(res["primID"][~miss] >= 0))
+        self.assertTrue(np.any(res["u"][~miss] != 0.0))
+
+    def test_missed_ray_output_is_independent_of_batch_order(self):
+        """Reordering the batch must not change any ray's own result."""
+        order = np.array([3, 0, 3, 1, 3, 2, 3], dtype=np.intp)
+        a = self.scene.run(self.origins, self.dirs, output=1)
+        b = self.scene.run(
+            np.ascontiguousarray(self.origins[order]),
+            np.ascontiguousarray(self.dirs[order]),
+            output=1,
+        )
+        for key in ("primID", "geomID", "u", "v", "tfar", "Ng"):
+            np.testing.assert_array_equal(a[key][order], b[key])
+
+
 class TestOccludedQuery(TestCase):
     def test_occluded(self):
         """Occluded query: hits return >= 0, misses return -1."""

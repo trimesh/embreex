@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=59.0",
+    "setuptools>=77.0",
     "numpy",
     "cython>=3.0"
 ]
@@ -14,7 +14,8 @@ version = "4.4.0"
 dependencies = ["numpy"]
 description = "Python binding for Intel's Embree ray engine"
 readme = {file = "README.md", content-type = "text/markdown"}
-license = {file = "LICENSE"}
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
 
 [project.urls]
 Source = "https://github.com/trimesh/embreex"

@@ -119,14 +119,28 @@ cdef class EmbreeScene:
                         else:
                             tfars[i] = rayhit.ray.tfar
                     else:
-                        primID_arr[i] = -1 if rayhit.hit.primID == INVALID_GEOMETRY_ID else <int>rayhit.hit.primID
-                        geomID_arr[i] = -1 if rayhit.hit.geomID == INVALID_GEOMETRY_ID else <int>rayhit.hit.geomID
-                        u_arr[i] = rayhit.hit.u
-                        v_arr[i] = rayhit.hit.v
                         tfars[i] = rayhit.ray.tfar
-                        Ng_arr[i, 0] = rayhit.hit.Ng_x
-                        Ng_arr[i, 1] = rayhit.hit.Ng_y
-                        Ng_arr[i, 2] = rayhit.hit.Ng_z
+                        if rayhit.hit.primID == INVALID_GEOMETRY_ID:
+                            # Embree writes the hit fields only when a ray hits
+                            # something, and `rayhit` is reused across the loop,
+                            # so on a miss `rayhit.hit` still describes whichever
+                            # ray hit something last. Report zeros instead of
+                            # leaking that previous ray's surface.
+                            primID_arr[i] = -1
+                            geomID_arr[i] = -1
+                            u_arr[i] = 0.0
+                            v_arr[i] = 0.0
+                            Ng_arr[i, 0] = 0.0
+                            Ng_arr[i, 1] = 0.0
+                            Ng_arr[i, 2] = 0.0
+                        else:
+                            primID_arr[i] = <int>rayhit.hit.primID
+                            geomID_arr[i] = -1 if rayhit.hit.geomID == INVALID_GEOMETRY_ID else <int>rayhit.hit.geomID
+                            u_arr[i] = rayhit.hit.u
+                            v_arr[i] = rayhit.hit.v
+                            Ng_arr[i, 0] = rayhit.hit.Ng_x
+                            Ng_arr[i, 1] = rayhit.hit.Ng_y
+                            Ng_arr[i, 2] = rayhit.hit.Ng_z
                 else:
                     rtcOccluded1(self.scene_i, &rayhit.ray, NULL)
                     # In Embree 4, occlusion is signaled by setting ray.tfar to -inf

@@ -2,6 +2,14 @@ name: Build Wheels
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
+# cancel superseded PR builds but never interrupt a release from `main`
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   wheels:
     name: Build wheel on ${{ matrix.os }}
@@ -10,65 +18,70 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-15-intel, macos-latest]
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      name: Install Python
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
-        python-version: '3.14'
-    - name: Install cibuildwheel
-      run: |
-        python -m pip install cibuildwheel==3.4.1
-    - name: Build wheel
-      run: |
-        python -m cibuildwheel --output-dir dist
-    - uses: actions/upload-artifact@v4
+        persist-credentials: false
+    - name: Build wheels
+      uses: pypa/cibuildwheel@8c2dcd2e96041a619f5ff03c9638d7941e2553a4 # v4.3.3
+      with:
+        output-dir: dist
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: wheels-${{ matrix.os }}
         path: dist/
 
   release:
     permissions:
-      contents: write  # for actions/create-release
+      contents: write  # to create the GitHub release and upload wheels to it
     name: Create GitHub Release
     needs: [wheels, pypi]
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Tag Version
         id: set_tag
         run: |
-          export V=$(python -c "print(next(iter(eval(L.split('=')[-1]) for L in open('pyproject.toml') if 'version =' in L)))")
-          echo "tag=${V}" >> "$GITHUB_ENV"
-      - uses: actions/download-artifact@v4
+          V=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "tag=${V}" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           pattern: wheels-*
           merge-multiple: true
       - name: Create Release
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          tag: ${{ env.tag }}
-          artifacts: "dist/*.whl"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.set_tag.outputs.tag }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.whl --clobber
+          else
+            gh release create "$TAG" dist/*.whl --target "$GITHUB_SHA" --title "$TAG"
+          fi
+
   pypi:
     name: Release to PyPI
     needs: [wheels]
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/embreex
     permissions:
-      id-token: write
+      id-token: write  # for PyPI trusted publishing
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
       - name: Download Wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           pattern: wheels-*
           merge-multiple: true
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.13.0
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist

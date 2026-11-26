@@ -32,6 +32,7 @@ embreex = ["*.pxd"]
 [tool.cibuildwheel]
 skip =  "*i686 *-win32 *musllinux*"
 manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
 before-test = "pip install pytest"
 test-command = "pytest -v {project}/tests"
 before-build = "python {project}/package/fetch-embree.py --install embree4"
@@ -46,6 +47,11 @@ repair-wheel-command = "DYLD_LIBRARY_PATH=embree4/lib delocate-listdeps -a {whee
 
 [tool.cibuildwheel.linux]
 repair-wheel-command = "LD_LIBRARY_PATH=`realpath embree4/lib`; auditwheel repair -w {dest_dir} {wheel}"
+
+# embree has no binary release for Linux aarch64 so build it from source
+[[tool.cibuildwheel.overrides]]
+select = "*-manylinux_aarch64"
+before-all = "bash {project}/package/build-embree.sh"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "UP" ]
